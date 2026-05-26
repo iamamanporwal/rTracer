@@ -2,6 +2,7 @@ import { createRootRoute, createRoute, createRouter, Outlet, Link } from '@tanst
 import { HubLanding } from './hub/hub-landing';
 import { ZoneSelect } from './hub/zone-select';
 import { VehicleSelect } from './hub/vehicle-select';
+import { ReadyToDrive } from './hub/ready-to-drive';
 import { PassportView } from './passport/passport-view';
 import { PlayPlaceholder } from './zone/play-placeholder';
 
@@ -41,7 +42,7 @@ const rootRoute = createRootRoute({
           <Outlet />
         </main>
         <footer className="border-t border-trace-line px-6 py-3 text-xs text-trace-muted font-mono">
-          phase 0 · {import.meta.env.MODE}
+          phase 1 · w1 · {import.meta.env.MODE}
         </footer>
       </div>
     );
@@ -72,6 +73,12 @@ const passportRoute = createRoute({
   component: PassportView,
 });
 
+const readyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/ready',
+  component: ReadyToDrive,
+});
+
 const playRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/play/$zoneId',
@@ -82,6 +89,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   zonesRoute,
   vehiclesRoute,
+  readyRoute,
   passportRoute,
   playRoute,
 ]);

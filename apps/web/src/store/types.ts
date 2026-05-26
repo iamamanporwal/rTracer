@@ -11,17 +11,19 @@ export type ZoneLoadStatus =
   | { phase: 'ready' }
   | { phase: 'error'; message: string };
 
+export type ManifestRef = { id: string; version: string };
+
 export type ZoneSlice = {
-  selectedZoneId: string | null;
+  selectedZone: ManifestRef | null;
   loadStatus: ZoneLoadStatus;
-  selectZone: (id: string | null) => void;
+  selectZone: (ref: ManifestRef | null) => void;
   setLoadStatus: (s: ZoneLoadStatus) => void;
 };
 
 export type VehicleSlice = {
-  selectedVehicleId: string | null;
+  selectedVehicle: ManifestRef | null;
   liveryColor: `#${string}`;
-  selectVehicle: (id: string | null) => void;
+  selectVehicle: (ref: ManifestRef | null) => void;
   setLiveryColor: (hex: `#${string}`) => void;
 };
 

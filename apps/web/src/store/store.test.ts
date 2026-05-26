@@ -12,10 +12,12 @@ describe('root store', () => {
     expect(state.editor).toBeDefined();
   });
 
-  it('selectZone updates zone slice', () => {
-    useStore.getState().zone.selectZone('zone_demo');
-    expect(useStore.getState().zone.selectedZoneId).toBe('zone_demo');
+  it('selectZone updates zone slice with id+version ref', () => {
+    useStore.getState().zone.selectZone({ id: 'zone_alpha', version: '0.1.0' });
+    expect(useStore.getState().zone.selectedZone?.id).toBe('zone_alpha');
+    expect(useStore.getState().zone.selectedZone?.version).toBe('0.1.0');
     useStore.getState().zone.selectZone(null);
+    expect(useStore.getState().zone.selectedZone).toBeNull();
   });
 
   it('awardStamp appends to passport snapshot', () => {

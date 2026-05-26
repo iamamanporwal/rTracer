@@ -18,11 +18,11 @@ import type {
 } from './types';
 
 const initialZone = (set: ZustandSetter): ZoneSlice => ({
-  selectedZoneId: null,
+  selectedZone: null,
   loadStatus: { phase: 'idle' },
-  selectZone: (id) =>
+  selectZone: (ref) =>
     set((s) => {
-      s.zone.selectedZoneId = id;
+      s.zone.selectedZone = ref;
     }),
   setLoadStatus: (status) =>
     set((s) => {
@@ -31,11 +31,11 @@ const initialZone = (set: ZustandSetter): ZoneSlice => ({
 });
 
 const initialVehicle = (set: ZustandSetter): VehicleSlice => ({
-  selectedVehicleId: null,
+  selectedVehicle: null,
   liveryColor: '#ffd84a',
-  selectVehicle: (id) =>
+  selectVehicle: (ref) =>
     set((s) => {
-      s.vehicle.selectedVehicleId = id;
+      s.vehicle.selectedVehicle = ref;
     }),
   setLiveryColor: (hex) =>
     set((s) => {
