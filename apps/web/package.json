@@ -1,0 +1,50 @@
+{
+  "name": "@trace/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Trace — the whole product. Vite SPA, deploys to Vercel.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "1.79.0",
+    "@trace/core": "workspace:*",
+    "@trace/editor": "workspace:*",
+    "@trace/physics": "workspace:*",
+    "@trace/renderer": "workspace:*",
+    "@trace/softbody": "workspace:*",
+    "@sentry/react": "8.36.0",
+    "idb": "8.0.0",
+    "immer": "10.1.1",
+    "lucide-react": "0.453.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zod": "3.23.8",
+    "zustand": "5.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.48.2",
+    "@sentry/vite-plugin": "2.22.6",
+    "@tanstack/router-devtools": "1.79.0",
+    "@testing-library/jest-dom": "6.6.3",
+    "@testing-library/react": "16.0.1",
+    "@types/node": "20.16.13",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react-swc": "3.7.1",
+    "autoprefixer": "10.4.20",
+    "happy-dom": "15.7.4",
+    "postcss": "8.4.47",
+    "tailwindcss": "3.4.14",
+    "vite": "5.4.10",
+    "vitest": "2.1.4"
+  }
+}

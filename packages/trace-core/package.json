@@ -1,0 +1,23 @@
+{
+  "name": "@trace/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure TS, zero deps. Math, types, manifests, scoring.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "vitest": "2.1.4"
+  }
+}
