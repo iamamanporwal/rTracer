@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "zoneId": "zone_alpha",
+  "centerline": {
+    "nodes": [
+      [0, 0, 0],
+      [100, 0, 0],
+      [200, 0, 0]
+    ],
+    "splineType": "catmull_rom",
+    "roadWidthM": 12.0
+  },
+  "barriers": [],
+  "startFinish": {
+    "a": [0, 0, -6],
+    "b": [0, 0, 6]
+  },
+  "checkpoints": [],
+  "spawnPoints": [
+    {
+      "id": "pit_main",
+      "position": [0, 0.5, 0],
+      "facingYawDeg": 0
+    }
+  ]
+}

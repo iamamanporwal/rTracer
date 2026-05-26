@@ -1,0 +1,24 @@
+{
+  "id": "zone_alpha",
+  "name": "Trace Alpha",
+  "version": "0.1.0",
+  "physicsProfile": "tarmac_circuit",
+  "controlScheme": "circuit",
+  "fidelityTier": "low",
+  "assets": {
+    "mesh": "mesh.glb",
+    "collider": "collider.glb",
+    "textures": "textures.ktx2",
+    "skybox": "skybox.hdr"
+  },
+  "semanticSidecar": "semantic.json",
+  "spawnPoints": [
+    {
+      "id": "pit_main",
+      "position": [0, 0.5, 0],
+      "rotation": [0, 0, 0, 1]
+    }
+  ],
+  "modesSupported": ["free_roam", "timed_run"],
+  "credits": "Trace placeholder, P1 W1"
+}

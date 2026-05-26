@@ -1,0 +1,34 @@
+{
+  "id": "vehicle_alpha",
+  "displayName": "Alpha Demo",
+  "version": "0.1.0",
+  "visualMesh": "visual.glb",
+  "proxyMesh": "proxy.glb",
+  "skinning": "skinning.bin",
+  "rig": {
+    "wheels": [
+      { "position": [-0.75, 0.3, 1.35], "radius": 0.31, "isDriven": false, "isSteered": true },
+      { "position": [0.75, 0.3, 1.35], "radius": 0.31, "isDriven": false, "isSteered": true },
+      { "position": [-0.75, 0.3, -1.35], "radius": 0.31, "isDriven": true, "isSteered": false },
+      { "position": [0.75, 0.3, -1.35], "radius": 0.31, "isDriven": true, "isSteered": false }
+    ],
+    "seat": [0.4, 0.9, 0.1]
+  },
+  "mass": 1200,
+  "inertiaTensor": [1400, 1500, 600],
+  "engine": {
+    "powerCurveHpAtRpm": [
+      [1000, 30],
+      [3000, 110],
+      [5000, 180],
+      [7000, 220]
+    ],
+    "redline": 7500
+  },
+  "gearbox": {
+    "ratios": [3.6, 2.1, 1.4, 1.0, 0.8],
+    "final": 3.9,
+    "type": "manual"
+  },
+  "credits": "Trace placeholder, P1 W1"
+}
