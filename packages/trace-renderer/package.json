@@ -15,9 +15,11 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@trace/core": "workspace:*"
+    "@trace/core": "workspace:*",
+    "three": "0.169.0"
   },
   "devDependencies": {
+    "@types/three": "0.169.0",
     "vitest": "2.1.4"
   }
 }

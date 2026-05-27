@@ -4,7 +4,7 @@ import { ZoneSelect } from './hub/zone-select';
 import { VehicleSelect } from './hub/vehicle-select';
 import { ReadyToDrive } from './hub/ready-to-drive';
 import { PassportView } from './passport/passport-view';
-import { PlayPlaceholder } from './zone/play-placeholder';
+import { Play } from './zone/play';
 
 const rootRoute = createRootRoute({
   component: function Root() {
@@ -42,7 +42,7 @@ const rootRoute = createRootRoute({
           <Outlet />
         </main>
         <footer className="border-t border-trace-line px-6 py-3 text-xs text-trace-muted font-mono">
-          phase 1 · w1 · {import.meta.env.MODE}
+          phase 1 · w2 · {import.meta.env.MODE}
         </footer>
       </div>
     );
@@ -82,7 +82,7 @@ const readyRoute = createRoute({
 const playRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/play/$zoneId',
-  component: PlayPlaceholder,
+  component: Play,
 });
 
 const routeTree = rootRoute.addChildren([

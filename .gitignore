@@ -34,3 +34,6 @@ test-results
 
 # Vercel
 .vercel
+
+# Claude Code local state
+.claude/

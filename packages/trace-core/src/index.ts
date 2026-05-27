@@ -8,3 +8,5 @@ export const TRACE_CORE_VERSION = '0.0.0';
 
 export * from './math';
 export * from './manifests';
+export * from './events';
+export * from './surface';

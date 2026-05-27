@@ -68,7 +68,7 @@ export function ReadyToDrive() {
         <SummaryCard
           icon={<MapPinned size={18} />}
           kind="Zone"
-          ref={zoneRef}
+          assetRef={zoneRef}
           line2={
             zone.status === 'ready'
               ? `${zone.value.name} · ${zone.value.physicsProfile} · ${zone.value.fidelityTier}`
@@ -80,7 +80,7 @@ export function ReadyToDrive() {
         <SummaryCard
           icon={<Car size={18} />}
           kind="Vehicle"
-          ref={vehicleRef}
+          assetRef={vehicleRef}
           line2={
             vehicle.status === 'ready'
               ? `${vehicle.value.displayName} · ${vehicle.value.mass} kg · ${vehicle.value.gearbox.type}`
@@ -117,7 +117,7 @@ export function ReadyToDrive() {
 function SummaryCard(props: {
   icon: React.ReactNode;
   kind: string;
-  ref: { id: string; version: string };
+  assetRef: { id: string; version: string };
   line2: string;
 }) {
   return (
@@ -127,7 +127,7 @@ function SummaryCard(props: {
         <span className="text-xs uppercase tracking-wider font-mono">{props.kind}</span>
       </div>
       <div className="mt-3 font-mono text-xs text-trace-muted">
-        {props.ref.id} · v{props.ref.version}
+        {props.assetRef.id} · v{props.assetRef.version}
       </div>
       <div className="mt-1 text-sm">{props.line2}</div>
     </div>

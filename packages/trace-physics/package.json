@@ -15,7 +15,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@trace/core": "workspace:*"
+    "@trace/core": "workspace:*",
+    "@dimforge/rapier3d-compat": "0.14.0"
   },
   "devDependencies": {
     "vitest": "2.1.4"

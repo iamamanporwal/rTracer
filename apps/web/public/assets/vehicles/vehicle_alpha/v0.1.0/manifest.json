@@ -7,10 +7,10 @@
   "skinning": "skinning.bin",
   "rig": {
     "wheels": [
-      { "position": [-0.75, 0.3, 1.35], "radius": 0.31, "isDriven": false, "isSteered": true },
-      { "position": [0.75, 0.3, 1.35], "radius": 0.31, "isDriven": false, "isSteered": true },
-      { "position": [-0.75, 0.3, -1.35], "radius": 0.31, "isDriven": true, "isSteered": false },
-      { "position": [0.75, 0.3, -1.35], "radius": 0.31, "isDriven": true, "isSteered": false }
+      { "position": [-0.75, 0.3, 1.35], "radius": 0.48, "isDriven": false, "isSteered": true },
+      { "position": [0.75, 0.3, 1.35], "radius": 0.48, "isDriven": false, "isSteered": true },
+      { "position": [-0.75, 0.3, -1.35], "radius": 0.48, "isDriven": true, "isSteered": false },
+      { "position": [0.75, 0.3, -1.35], "radius": 0.48, "isDriven": true, "isSteered": false }
     ],
     "seat": [0.4, 0.9, 0.1]
   },
