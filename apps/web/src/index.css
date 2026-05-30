@@ -11,3 +11,33 @@
     -moz-osx-font-smoothing: grayscale;
   }
 }
+
+/* Game-mode (Most Wanted) menu motion. Kept here so route components can lean
+   on class names instead of inlining keyframes. */
+@layer utilities {
+  @keyframes mw-rise {
+    from {
+      opacity: 0;
+      transform: translateX(-1.25rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  .mw-rise {
+    animation: mw-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes mw-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .mw-fade {
+    animation: mw-fade 0.5s ease both;
+  }
+}

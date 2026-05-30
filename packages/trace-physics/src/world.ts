@@ -36,6 +36,12 @@ export type PhysicsWorldOptions = {
   gravity?: { x: number; y: number; z: number };
   /** Fixed timestep in seconds. Default: 1/60 (per §5.2). */
   timestep?: number;
+  /**
+   * Constraint solver iterations. More iterations = stiffer, less jittery
+   * stacks/suspension at a modest CPU cost. Default 8 (Rapier's own default is
+   * 4) — chosen to keep the raycast vehicle planted without hurting mobile.
+   */
+  numSolverIterations?: number;
 };
 
 /**
@@ -53,6 +59,7 @@ export function createPhysicsWorld(options: PhysicsWorldOptions = {}): PhysicsWo
 
   const world = new RAPIER.World(gravity);
   world.timestep = timestep;
+  world.numSolverIterations = options.numSolverIterations ?? 8;
 
   return {
     world,

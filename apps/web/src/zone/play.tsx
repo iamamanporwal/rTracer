@@ -47,7 +47,7 @@ export function Play() {
           to="/"
           className="inline-block mt-6 px-4 py-2 rounded-lg border border-trace-line text-sm"
         >
-          ← back to hub
+          ← Garage
         </Link>
       </div>
     );
@@ -73,17 +73,20 @@ function CanvasMount(props: {
   liveryColor: `#${string}`;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sessionRef = useRef<ZoneSession | null>(null);
   const [stats, setStats] = useState<SessionStats>({ speedMs: 0, fps: 60 });
   const [weather, setWeather] = useState<string>('Clear');
   const [camera, setCamera] = useState<string>('Chase');
+  const [skeleton, setSkeletonState] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    let session: ZoneSession | null = null;
     let cancelled = false;
+    setLoading(true);
 
     startZoneSession({
       canvas,
@@ -93,13 +96,15 @@ function CanvasMount(props: {
       onStats: (s) => setStats(s),
       onWeather: (w) => setWeather(w),
       onCameraMode: (m) => setCamera(m),
+      onSkeleton: (on) => setSkeletonState(on),
     })
       .then((s) => {
         if (cancelled) {
           s.dispose();
           return;
         }
-        session = s;
+        sessionRef.current = s;
+        setLoading(false);
       })
       .catch((e: unknown) => {
         setError(e instanceof Error ? e : new Error(String(e)));
@@ -107,9 +112,16 @@ function CanvasMount(props: {
 
     return () => {
       cancelled = true;
-      session?.dispose();
+      sessionRef.current?.dispose();
+      sessionRef.current = null;
     };
   }, [props.zone, props.vehicle, props.liveryColor]);
+
+  const toggleSkeleton = (next: boolean): void => {
+    // setSkeleton goes through the session, which fires onSkeleton → React
+    // state update. Keeps O-key + checkbox in sync without optimistic updates.
+    sessionRef.current?.setSkeleton(next);
+  };
 
   if (error) {
     return (
@@ -122,21 +134,36 @@ function CanvasMount(props: {
           to="/"
           className="inline-block mt-6 px-4 py-2 rounded-lg border border-trace-line text-sm"
         >
-          ← back to hub
+          ← Garage
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 top-[60px] bg-black">
+    <div className="fixed inset-0 bg-black">
       <canvas ref={canvasRef} className="block w-full h-full outline-none" tabIndex={0} />
+      {loading && (
+        <div className="absolute inset-0 grid place-items-center bg-black/70 backdrop-blur-sm">
+          <div className="text-center">
+            <div className="font-mono text-xs uppercase tracking-wider text-trace-muted">
+              {props.vehicle.displayName}
+            </div>
+            <div className="mt-2 flex items-center gap-3 text-trace-fg">
+              <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-trace-line border-t-trace-accent" />
+              Loading vehicle…
+            </div>
+          </div>
+        </div>
+      )}
       <Hud
         zone={props.zone}
         vehicle={props.vehicle}
         stats={stats}
         weather={weather}
         camera={camera}
+        skeleton={skeleton}
+        onSkeletonChange={toggleSkeleton}
       />
     </div>
   );
@@ -148,6 +175,8 @@ function Hud(props: {
   stats: SessionStats;
   weather: string;
   camera: string;
+  skeleton: boolean;
+  onSkeletonChange: (next: boolean) => void;
 }) {
   const kmh = props.stats.speedMs * 3.6;
   return (
@@ -162,13 +191,32 @@ function Hud(props: {
         </div>
       </div>
       <div className="absolute top-3 right-3 px-3 py-2 rounded-md bg-black/55 backdrop-blur text-xs font-mono text-right">
-        <div className="text-trace-fg text-2xl leading-none">{kmh.toFixed(0)}</div>
+        <div data-testid="hud-speed-kmh" className="text-trace-fg text-2xl leading-none">
+          {kmh.toFixed(0)}
+        </div>
         <div className="text-trace-muted uppercase tracking-wider">km/h</div>
         <div className="text-trace-muted mt-1">{props.stats.fps.toFixed(0)} fps</div>
       </div>
+      {/* Invisible-Skeleton toggle — surfaces the physics debug overlay
+          (colliders, suspension rays, contacts, COM, velocity) that makes the
+          car's underlying tire and chassis simulation visible. The O hotkey
+          still works; this checkbox is just a discoverable alternative. */}
+      <label
+        className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-2 rounded-md bg-black/55 backdrop-blur text-xs font-mono text-trace-fg flex items-center gap-2 cursor-pointer select-none hover:text-trace-accent"
+        title="Show the physics rig — colliders, suspension rays, connection nodes (purple = body mount, orange = wheel hub), wheel contacts, COM, velocity (hotkey: O)"
+      >
+        <input
+          type="checkbox"
+          checked={props.skeleton}
+          onChange={(e) => props.onSkeletonChange(e.target.checked)}
+          className="accent-trace-accent"
+          data-testid="hud-skeleton-toggle"
+        />
+        <span>Invisible Skeleton</span>
+      </label>
       <div className="absolute bottom-3 left-3 px-3 py-2 rounded-md bg-black/55 backdrop-blur text-[11px] font-mono text-trace-muted">
-        W/S drive · A/D steer · Space handbrake · R reset · C camera · Y weather · Mouse look · Wheel
-        zoom
+        W/S drive · A/D steer · Space handbrake/drift · R reset · C camera · Y weather · O debug ·
+        Mouse look · Wheel zoom
       </div>
       <Link
         to="/"

@@ -10,7 +10,12 @@ import type { ControlInput } from '@trace/physics';
  */
 
 const THROTTLE_RAMP_PER_SEC = 4;
-const BRAKE_RAMP_PER_SEC = 8;
+/**
+ * 60 ms ramp from 0 → 1 for the foot brake — avoids the instant-brake "stoppie"
+ * by giving the chassis ~3 frames at 60 fps to compress the front struts before
+ * full brake torque hits the wheels. Per the brake-fix spec.
+ */
+const BRAKE_RAMP_PER_SEC = 1000 / 60;
 const STEER_RAMP_PER_SEC = 4;
 const STEER_RECENTER_PER_SEC = 6;
 

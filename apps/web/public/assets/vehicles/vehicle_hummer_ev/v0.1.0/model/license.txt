@@ -1,0 +1,11 @@
+Model Information:
+* title:	2024 GMC Hummer EV SUV
+* source:	https://sketchfab.com/3d-models/2024-gmc-hummer-ev-suv-7cd584fc9ba54acd9002d4286a08e419
+* author:	Ddiaz Design (https://sketchfab.com/ddiaz-design)
+
+Model License:
+* license type:	CC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)
+* requirements:	Author must be credited. No commercial use. Modified versions must have the same license.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "2024 GMC Hummer EV SUV" (https://sketchfab.com/3d-models/2024-gmc-hummer-ev-suv-7cd584fc9ba54acd9002d4286a08e419) by Ddiaz Design (https://sketchfab.com/ddiaz-design) licensed under CC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)

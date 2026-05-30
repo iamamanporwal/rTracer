@@ -4,6 +4,7 @@ import type {
   EditorMode,
   EditorSlice,
   LapRecord,
+  ManifestRef,
   PassportSlice,
   PassportSnapshot,
   RootStore,
@@ -126,4 +127,5 @@ export type {
   UISlice,
   EditorSlice,
   ZoneLoadStatus,
+  ManifestRef,
 };

@@ -1,14 +1,14 @@
 import type { CameraControl } from '@trace/renderer';
 
 /**
- * Mouse → {@link CameraControl} mapping — a GTA-style orbit camera.
+ * Mouse → {@link CameraControl} mapping — a free-look orbit camera.
  *
  *   - Click the canvas to lock the pointer; moving the mouse then swings the
  *     camera around the car (yaw + pitch). Dragging with a held button works
  *     too, for browsers/users that don't want pointer lock. Esc releases.
  *   - The mouse wheel zooms the follow distance.
- *   - When the mouse goes idle, the orbit decays back to directly behind the
- *     car's heading — the signature GTA "camera drifts back when you drive".
+ *   - Orbit is sticky: once the player has aimed the camera it stays there
+ *     until the next mouse movement (no auto-recenter behind the car).
  *
  * The driver owns its own listeners and is sampled once per rendered frame.
  */
@@ -20,8 +20,6 @@ const PITCH_MAX = 1.15; // looking down on the car
 const ZOOM_STEP = 0.12;
 const ZOOM_MIN = 0.55;
 const ZOOM_MAX = 2.4;
-const IDLE_DELAY_MS = 1600; // how long after the last look input before drifting back
-const RECENTER_RATE = 1.8; // gentle yaw/pitch decay once idle (smooth, not a snap)
 
 export type CameraInputDriver = {
   /** Advance recenter smoothing by `dt` and return the latest camera control. Allocates nothing. */
@@ -33,13 +31,11 @@ export function createCameraInput(canvas: HTMLCanvasElement): CameraInputDriver 
   const control: CameraControl = { yaw: 0, pitch: 0.12, distance: 1 };
   let locked = false;
   let dragging = false;
-  let lastInputTs = -Infinity;
 
   function onMouseMove(e: MouseEvent): void {
     if (!locked && !dragging) return;
     control.yaw -= e.movementX * YAW_SENS;
     control.pitch = clamp(control.pitch + e.movementY * PITCH_SENS, PITCH_MIN, PITCH_MAX);
-    lastInputTs = performance.now();
   }
 
   function onMouseDown(): void {
@@ -56,7 +52,6 @@ export function createCameraInput(canvas: HTMLCanvasElement): CameraInputDriver 
     e.preventDefault();
     const dir = e.deltaY > 0 ? 1 : -1;
     control.distance = clamp(control.distance + dir * ZOOM_STEP, ZOOM_MIN, ZOOM_MAX);
-    lastInputTs = performance.now();
   }
 
   function onPointerLockChange(): void {
@@ -70,14 +65,9 @@ export function createCameraInput(canvas: HTMLCanvasElement): CameraInputDriver 
   document.addEventListener('pointerlockchange', onPointerLockChange);
 
   return {
-    sample(dt) {
-      const idle = performance.now() - lastInputTs > IDLE_DELAY_MS;
-      if (idle) {
-        // Critically-damped decay back behind the car. Distance is sticky.
-        const alpha = 1 - Math.exp(-RECENTER_RATE * dt);
-        control.yaw += (0 - control.yaw) * alpha;
-        control.pitch += (0.12 - control.pitch) * alpha;
-      }
+    sample() {
+      // Sticky orbit — the camera holds wherever the player last left it. No
+      // idle decay back behind the car (that was fighting the player's aim).
       return control;
     },
     dispose() {

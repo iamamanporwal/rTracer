@@ -90,7 +90,12 @@ describe('vehicle drive direction', () => {
 
   it('reverse (S from standstill) drives the car backward, toward the camera (−Z)', () => {
     const snap = drive(input({ brake: 1 }), 120);
-    expect(snap.position.z).toBeLessThan(-0.5);
+    // With the chassis-impulse reverse path the car gets a real launch backward
+    // — well past the old threshold (~0.45 m in 2 s). A 1 m floor confirms the
+    // bypass is active and Rapier's weak wheel-friction reverse hasn't crept
+    // back in, while leaving headroom for the soft cap to taper the top speed
+    // (≈ 10–15 km/h target).
+    expect(snap.position.z).toBeLessThan(-1.0);
   });
 
   // Facing +Z with +Y up, the player's right is forward × up = +Z × +Y = −X, so
@@ -104,5 +109,20 @@ describe('vehicle drive direction', () => {
   it('steering right (D) while driving forward curves the car to the right (−X)', () => {
     const snap = drive(input({ throttle: 1, steering: 1 }), 120);
     expect(snap.position.x).toBeLessThan(-0.5);
+  });
+
+  // Reverse turning: the chassis-velocity bypass would otherwise hold the car
+  // on a straight backward line. These two assert the bicycle-model yaw is
+  // applied, with sign matching forward driving (A → +X side, D → −X side).
+  it('reverse + steering left (S + A) curves the car backward and to +X', () => {
+    const snap = drive(input({ brake: 1, steering: -1 }), 120);
+    expect(snap.position.z).toBeLessThan(-0.5); // still going backward
+    expect(snap.position.x).toBeGreaterThan(0.3); // and curving toward +X
+  });
+
+  it('reverse + steering right (S + D) curves the car backward and to −X', () => {
+    const snap = drive(input({ brake: 1, steering: 1 }), 120);
+    expect(snap.position.z).toBeLessThan(-0.5);
+    expect(snap.position.x).toBeLessThan(-0.3);
   });
 });

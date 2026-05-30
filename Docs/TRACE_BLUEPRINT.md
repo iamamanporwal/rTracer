@@ -1324,12 +1324,140 @@ Async: PR descriptions start with `[task ID]`, the exit criterion advanced, and 
 
 ---
 
-## 27. Change Log
+## 27. Aman's PM Instincts
+
+> **What this section is.** The blueprint is the contract; the build is where it
+> meets reality. During the Week 2–3 build I (Aman, PM) made calls that diverge
+> from or extend Parts I/II and aren't yet folded back into them. Per §19.3 —
+> _"if they disagree, fix the doc, not the code"_ — this section records those
+> calls, what each one overrides or extends, and the reasoning behind it, so the
+> contract stays honest until the next planner pass reconciles the body.
+>
+> These are **adopted decisions**, not proposals. They are live in the working
+> tree today. Where one contradicts a stated Phase 1 scope line or non-goal,
+> that's called out explicitly.
+
+### 27.1 Three real licensed cars now, not one procedural car
+
+- **Overrides:** §1 ("one hub + **one** vehicle"), §1 non-goals ("Sketchfab
+  import"), and pre-empts Q-2.
+- **What shipped:** three downloaded glTF cars — `vehicle_corvette_c2` (light
+  ~1.45 t RWD V8 sports), `vehicle_charger_rt` (heavier ~1.75 t RWD V8 muscle),
+  and `vehicle_hummer_ev` (~4.1 t AWD electric truck). `vehicle_alpha` stays as
+  the procedural fallback so nothing downstream breaks.
+- **Why (the instinct):** a player feels the product through the cars, not the
+  box. Three deliberately contrasting cars — light vs. heavy, combustion vs.
+  electric, RWD vs. AWD — prove the physics/feel differentiation in one sitting,
+  far better than a single primitive. It also de-risks the GLB pipeline now
+  instead of at W14.
+- **Hard constraint (Phase 2 gate):** all three are **CC-BY-NC-SA** Sketchfab
+  models (credited in each `manifest.json`). _Non-commercial_ means this is an
+  **internal prototype only** — it cannot ship to a public or partner build
+  until these are replaced with owned or distribution-licensed assets. This is a
+  blocker on the Phase 1 → "sellable" exit criterion, tracked here so it isn't
+  forgotten.
+
+### 27.2 Manifest extensions: `visual`, `tuning`, `audio`
+
+- **Extends:** §7.1 `VehicleManifest`. Three new **optional** blocks; every one
+  is absent on `vehicle_alpha`, so its behavior is byte-for-byte unchanged.
+- `visual` — `format: 'procedural' | 'glb'`, plus `scale` / `yaw` / `offset` and
+  a per-wheel mapping of glTF node names (`fl`/`fr`/`rl`/`rr`). Lets a manifest
+  bind a rigged GLB without code changes.
+- `tuning` — per-car dynamics that override the global feel constants in
+  `@trace/physics`: `driveAccelG`, `brakeDecelG`, `reverseAccelG`, `maxSteerDeg`,
+  `steerSpeedScale`, `frontBrakeBias`, `suspensionStiffnessScale`,
+  `suspensionTravelScale`, `gripScale`, `comHeightScale`. Suspension stiffness is
+  now **mass-scaled** against a reference mass so heavy cars don't bottom out.
+- `audio` — engine-sound profile: `kind: 'v8' | 'flat' | 'inline' | 'electric'`,
+  `idleHz`, `revHz`, `gain`.
+- **Why:** §7.2 described a single global vehicle feel. Real cars need
+  per-car character, and per Rule 3 ("every asset is data") that character
+  belongs in the manifest, not in branching code.
+
+### 27.3 GLB vehicle visual loader (production render path, pulled early)
+
+- **Realizes:** P1-14 ("demo vehicle visual mesh imported"), for real, plus the
+  wheel-rigging robustness the blueprint hand-waved.
+- `packages/trace-renderer/src/glb-vehicle-visual.ts` honors the same
+  `VehicleVisual` contract (`group` + `applySnapshot` + `dispose`) as the
+  procedural body, so the session wires either interchangeably. It reparents
+  each wheel cluster onto a pivot at the cluster's **bounding-box center** (the
+  true axle — downloaded exports can't be trusted to put node origins there),
+  matches pivots to physics wheels by nearest rig position, and mirrors
+  `GLTFLoader`'s node-name sanitization.
+
+### 27.4 Procedural engine audio, ahead of schedule
+
+- **Pulls forward:** §15 in-world engine voice / P1-62 (scheduled W12).
+- `packages/trace-renderer/src/engine-audio.ts` — a WebAudio synth (no samples):
+  detuned-sawtooth combustion (`v8`/`flat`/`inline`) with an RPM model derived
+  from wheel speed × gearbox, or a rising inverter whine for `electric` (the
+  Hummer). Built once, nudged per frame via `setTargetAtTime` (alloc-free,
+  click-free), resumes on first user gesture.
+- **Why:** audio _is_ most of "feel." It's cheap to prototype now and it's the
+  single biggest thing that makes the three cars read as different.
+
+### 27.5 Image-based lighting placeholder
+
+- **Extends:** §14 rendering.
+- `createEnvironmentMap` bakes Three's neutral `RoomEnvironment` to a PMREM once
+  at session start and feeds it to `scene.environment` and the GLB materials'
+  `envMap`, so PBR paint, chrome, and glass actually reflect. This is a
+  **placeholder** until the real HDRI skybox arrives with the zone art
+  (W4 / P1-17), at which point that replaces it.
+
+### 27.6 Two shells: Game mode vs. Dev mode
+
+- **Overrides:** §1's single "Hub" surface.
+- The manifest-driven hub is an **engineering console**, not a product. So the
+  router now serves a player-facing front door at `/` and demotes the old hub to
+  `/dev` (with `/zones`, `/vehicles`, `/ready`, `/passport` under a dev chrome
+  layout). A discreet "dev" link bridges them; it gets buried in Settings later.
+- **Why:** players should land in something that feels like a game on the first
+  paint; engineers keep the raw manifest console. One router, two shells, zero
+  duplicated data.
+
+### 27.7 NFS-Most-Wanted "Garage" as the front door
+
+- `apps/web/src/game/garage.tsx` — a cold-blue _Need for Speed: Most Wanted_-
+  styled car select: hero-car carousel, segmented stat meters, a single **DRIVE**
+  CTA that sets the store selection and drops straight into `/play`. It derives
+  display specs (peak hp, hp/ton, drivetrain AWD/RWD/FWD, class label, grip /
+  agility ratings) purely from the manifest + `tuning`. Adds an `mw` Tailwind
+  palette and the Oswald display font.
+- **Status:** M1 vertical slice — 2D, with a lucide car/truck glyph standing in
+  for the model. Live 3D turntable render, livery, and the title/main-menu shell
+  are **M2–M4**. The dev `vehicle-select` page was reworked into matching spec
+  cards.
+
+### 27.8 Milestone (Mx) vocabulary alongside the Week plan
+
+- The build is being paced in **player-visible milestones** (M1 = playable
+  garage → drive slice on real cars; M2–M4 = 3D garage, livery, menu shell, …)
+  layered on top of the blueprint's W1–W14 critical path (§21). This is an
+  **addition to the planner's vocabulary**, not a replacement — the two should be
+  reconciled in the next planner pass so task IDs and milestones line up.
+
+### 27.9 In-browser verification as a standing practice
+
+- **Complements:** §17's automated test layers.
+- Runtime/canvas changes are verified by **actually driving in the browser and
+  capturing screenshots**, not just by green CI gates. Evidence lives in
+  `Docs/_verify/` (`play-charger`, `play-corvette`, `play-hummer`,
+  `vehicles-page`, `motion-corvette-accel`, `motion-corvette-turn`). This
+  codifies a team norm: a gate being green is necessary, not sufficient — we look
+  at the thing.
+
+---
+
+## 28. Change Log
 
 | Date       | Version | Change                                                           |
 | ---------- | ------- | ---------------------------------------------------------------- |
 | 2026-05-26 | 1.0     | Combined arch + planner; pivoted to Vercel; removed Phase 1 auth |
+| 2026-05-27 | 1.1     | Added §27 "Aman's PM Instincts" — recorded W2–W3 build divergences: three real (NC-licensed) cars vs. one procedural; manifest `visual`/`tuning`/`audio` blocks; GLB visual loader; procedural engine audio; IBL placeholder; game/dev shell split; NFS-MW Garage front door; Mx milestone vocabulary; in-browser verification norm |
 
 ---
 
-_End of TRACE_BLUEPRINT.md v1.0._
+_End of TRACE_BLUEPRINT.md v1.1._

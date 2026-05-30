@@ -1,0 +1,3203 @@
+{
+  "accessors": [
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 4856,
+      "max": [
+        0.14174799621105194,
+        0.3442240059375763,
+        0.3442240059375763
+      ],
+      "min": [
+        -0.12887300550937653,
+        -0.34422698616981506,
+        -0.34422698616981506
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 58272,
+      "componentType": 5126,
+      "count": 4856,
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 4856,
+      "max": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 4856,
+      "max": [
+        0.9990230202674866,
+        0.9980469942092896
+      ],
+      "min": [
+        -0.0012910000514239073,
+        0.0007099999929778278
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 38848,
+      "componentType": 5126,
+      "count": 4856,
+      "max": [
+        0.9990230202674866,
+        0.9980469942092896
+      ],
+      "min": [
+        -0.0012910000514239073,
+        0.0007099999929778278
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "componentType": 5125,
+      "count": 20487,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 116544,
+      "componentType": 5126,
+      "count": 4853,
+      "max": [
+        0.14174799621105194,
+        0.3442240059375763,
+        0.3442240059375763
+      ],
+      "min": [
+        -0.12887300550937653,
+        -0.34422698616981506,
+        -0.34422698616981506
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 174780,
+      "componentType": 5126,
+      "count": 4853,
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 77696,
+      "componentType": 5126,
+      "count": 4853,
+      "max": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 77696,
+      "componentType": 5126,
+      "count": 4853,
+      "max": [
+        0.9990230202674866,
+        0.9980469942092896
+      ],
+      "min": [
+        -0.0012910000514239073,
+        0.0007099999929778278
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 116520,
+      "componentType": 5126,
+      "count": 4853,
+      "max": [
+        0.9990230202674866,
+        0.9980469942092896
+      ],
+      "min": [
+        -0.0012910000514239073,
+        0.0007099999929778278
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 81948,
+      "componentType": 5125,
+      "count": 20487,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 233016,
+      "componentType": 5126,
+      "count": 4806,
+      "max": [
+        0.1331859976053238,
+        0.34446001052856445,
+        0.3436489999294281
+      ],
+      "min": [
+        -0.20844799280166626,
+        -0.34446099400520325,
+        -0.343654990196228
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 290688,
+      "componentType": 5126,
+      "count": 4806,
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -0.9999499917030334
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 155344,
+      "componentType": 5126,
+      "count": 4806,
+      "max": [
+        1.0,
+        1.0,
+        0.9999500513076782,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -0.9999970197677612,
+        -1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 155344,
+      "componentType": 5126,
+      "count": 4806,
+      "max": [
+        0.9990230202674866,
+        0.9980469942092896
+      ],
+      "min": [
+        -0.0012910000514239073,
+        0.000666000007186085
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 193792,
+      "componentType": 5126,
+      "count": 4806,
+      "max": [
+        0.9990230202674866,
+        0.9980469942092896
+      ],
+      "min": [
+        -0.0012910000514239073,
+        0.000666000007186085
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 163896,
+      "componentType": 5125,
+      "count": 20253,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 348360,
+      "componentType": 5126,
+      "count": 4806,
+      "max": [
+        0.1331859976053238,
+        0.34446001052856445,
+        0.3436489999294281
+      ],
+      "min": [
+        -0.20844799280166626,
+        -0.34446099400520325,
+        -0.343654990196228
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 406032,
+      "componentType": 5126,
+      "count": 4806,
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -0.9999499917030334
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 232240,
+      "componentType": 5126,
+      "count": 4806,
+      "max": [
+        1.0,
+        1.0,
+        0.9999500513076782,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -0.9999970197677612,
+        -1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 232240,
+      "componentType": 5126,
+      "count": 4806,
+      "max": [
+        0.9990230202674866,
+        0.9980469942092896
+      ],
+      "min": [
+        -0.0012910000514239073,
+        0.000666000007186085
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 270688,
+      "componentType": 5126,
+      "count": 4806,
+      "max": [
+        0.9990230202674866,
+        0.9980469942092896
+      ],
+      "min": [
+        -0.0012910000514239073,
+        0.000666000007186085
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 244908,
+      "componentType": 5125,
+      "count": 20253,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 463704,
+      "componentType": 5126,
+      "count": 300,
+      "max": [
+        0.08229199796915054,
+        0.13159500062465668,
+        0.153656005859375
+      ],
+      "min": [
+        -0.08229199796915054,
+        -0.13158075511455536,
+        -0.06895799934864044
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 467304,
+      "componentType": 5126,
+      "count": 300,
+      "max": [
+        0.9999499917030334,
+        0.9023038744926453,
+        0.9982048869132996
+      ],
+      "min": [
+        -0.8414739370346069,
+        -0.8983844518661499,
+        -0.9982048869132996
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 309136,
+      "componentType": 5126,
+      "count": 300,
+      "max": [
+        1.0,
+        0.9811054468154907,
+        0.8209256529808044,
+        1.0
+      ],
+      "min": [
+        -0.9653030037879944,
+        -0.9947147965431213,
+        -0.9821978807449341,
+        -1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 309136,
+      "componentType": 5126,
+      "count": 300,
+      "max": [
+        0.9960939884185791,
+        1.4990229606628418
+      ],
+      "min": [
+        0.5087890028953552,
+        0.009398999623954296
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 311536,
+      "componentType": 5126,
+      "count": 300,
+      "max": [
+        0.9960939884185791,
+        1.4990229606628418
+      ],
+      "min": [
+        0.5087890028953552,
+        0.009398999623954296
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 325920,
+      "componentType": 5125,
+      "count": 834,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 470904,
+      "componentType": 5126,
+      "count": 297,
+      "max": [
+        0.08229199796915054,
+        0.13159500062465668,
+        0.153656005859375
+      ],
+      "min": [
+        -0.08229199796915054,
+        -0.13158075511455536,
+        -0.06895799934864044
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 474468,
+      "componentType": 5126,
+      "count": 297,
+      "max": [
+        0.9999499917030334,
+        0.9023038744926453,
+        0.9982048869132996
+      ],
+      "min": [
+        -0.8414739370346069,
+        -0.8983844518661499,
+        -0.9982048869132996
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 313936,
+      "componentType": 5126,
+      "count": 297,
+      "max": [
+        1.0,
+        0.9811054468154907,
+        0.8209256529808044,
+        1.0
+      ],
+      "min": [
+        -0.9653031229972839,
+        -0.9947147965431213,
+        -0.9821978807449341,
+        -1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 313936,
+      "componentType": 5126,
+      "count": 297,
+      "max": [
+        0.9960939884185791,
+        1.4990229606628418
+      ],
+      "min": [
+        0.5087890028953552,
+        0.009398999623954296
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 316312,
+      "componentType": 5126,
+      "count": 297,
+      "max": [
+        0.9960939884185791,
+        1.4990229606628418
+      ],
+      "min": [
+        0.5087890028953552,
+        0.009398999623954296
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 329256,
+      "componentType": 5125,
+      "count": 834,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 478032,
+      "componentType": 5126,
+      "count": 303,
+      "max": [
+        0.07530099898576736,
+        0.08765900135040283,
+        0.06514299660921097
+      ],
+      "min": [
+        -0.07530100643634796,
+        -0.08765900135040283,
+        -0.06514299660921097
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 481668,
+      "componentType": 5126,
+      "count": 303,
+      "max": [
+        1.0,
+        0.9995004534721375,
+        0.9999499917030334
+      ],
+      "min": [
+        -0.8813672065734863,
+        -0.9991511702537537,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 318688,
+      "componentType": 5126,
+      "count": 303,
+      "max": [
+        0.9984050989151001,
+        1.0,
+        0.9959437251091003,
+        1.0
+      ],
+      "min": [
+        -0.9999937415122986,
+        -0.9980213046073914,
+        -0.9959440231323242,
+        -1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 318688,
+      "componentType": 5126,
+      "count": 303,
+      "max": [
+        0.5385739803314209,
+        1.4990229606628418
+      ],
+      "min": [
+        0.004294999875128269,
+        0.01217699982225895
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 321112,
+      "componentType": 5126,
+      "count": 303,
+      "max": [
+        0.5385739803314209,
+        1.4990229606628418
+      ],
+      "min": [
+        0.004294999875128269,
+        0.01217699982225895
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 332592,
+      "componentType": 5125,
+      "count": 735,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 485304,
+      "componentType": 5126,
+      "count": 298,
+      "max": [
+        0.07530099898576736,
+        0.08765900135040283,
+        0.06514299660921097
+      ],
+      "min": [
+        -0.07530100643634796,
+        -0.08765900135040283,
+        -0.06514299660921097
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 488880,
+      "componentType": 5126,
+      "count": 298,
+      "max": [
+        1.0,
+        0.9995004534721375,
+        0.9999499917030334
+      ],
+      "min": [
+        -0.8813672065734863,
+        -0.9991511702537537,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 323536,
+      "componentType": 5126,
+      "count": 298,
+      "max": [
+        0.9984050989151001,
+        1.0,
+        0.9959437251091003,
+        1.0
+      ],
+      "min": [
+        -0.9999937415122986,
+        -0.9980213046073914,
+        -0.9959440231323242,
+        -1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 323536,
+      "componentType": 5126,
+      "count": 298,
+      "max": [
+        0.5385739803314209,
+        1.4990229606628418
+      ],
+      "min": [
+        0.004294999875128269,
+        0.01217699982225895
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 325920,
+      "componentType": 5126,
+      "count": 298,
+      "max": [
+        0.5385739803314209,
+        1.4990229606628418
+      ],
+      "min": [
+        0.004294999875128269,
+        0.01217699982225895
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 335532,
+      "componentType": 5125,
+      "count": 735,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 492456,
+      "componentType": 5126,
+      "count": 4,
+      "max": [
+        0.32936498522758484,
+        0.5536890029907227,
+        1.7846599817276
+      ],
+      "min": [
+        -0.32931798696517944,
+        0.056678999215364456,
+        1.7757240533828735
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 492504,
+      "componentType": 5126,
+      "count": 4,
+      "max": [
+        -0.0,
+        -0.019996002316474915,
+        0.9998001456260681
+      ],
+      "min": [
+        -0.0,
+        -0.019996002316474915,
+        0.9998001456260681
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 328304,
+      "componentType": 5126,
+      "count": 4,
+      "max": [
+        -1.0,
+        7.723031814066417e-08,
+        1.5446063317270387e-09,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -7.769127563506117e-08,
+        -1.5538255127012235e-09,
+        1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 328304,
+      "componentType": 5126,
+      "count": 4,
+      "max": [
+        25.191879272460938,
+        19.134319305419922
+      ],
+      "min": [
+        -24.191879272460938,
+        -18.134315490722656
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 328336,
+      "componentType": 5126,
+      "count": 4,
+      "max": [
+        25.191879272460938,
+        19.134319305419922
+      ],
+      "min": [
+        -24.191879272460938,
+        -18.134315490722656
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 338472,
+      "componentType": 5125,
+      "count": 6,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 492552,
+      "componentType": 5126,
+      "count": 45212,
+      "max": [
+        0.9914770126342773,
+        1.1108649969100952,
+        2.3736109733581543
+      ],
+      "min": [
+        -0.9914770126342773,
+        -0.04690900072455406,
+        -2.891757011413574
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 1035096,
+      "componentType": 5126,
+      "count": 45212,
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 328368,
+      "componentType": 5126,
+      "count": 45212,
+      "max": [
+        0.9565430283546448,
+        0.9682620167732239
+      ],
+      "min": [
+        0.03854399919509888,
+        0.5498049855232239
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 338496,
+      "componentType": 5125,
+      "count": 163983,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 1577640,
+      "componentType": 5126,
+      "count": 3232,
+      "max": [
+        0.9613140225410461,
+        1.090190052986145,
+        2.3170549869537354
+      ],
+      "min": [
+        -0.9613140225410461,
+        -0.008595000021159649,
+        -2.8700649738311768
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 1616424,
+      "componentType": 5126,
+      "count": 3232,
+      "max": [
+        1.0,
+        0.9998001456260681,
+        0.9991511702537537
+      ],
+      "min": [
+        -1.0,
+        -0.9998001456260681,
+        -0.9987524151802063
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 994428,
+      "componentType": 5125,
+      "count": 8307,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 1655208,
+      "componentType": 5126,
+      "count": 24114,
+      "max": [
+        0.8980420231819153,
+        1.1373120546340942,
+        0.9584800004959106
+      ],
+      "min": [
+        -0.8980420231819153,
+        0.051534999161958694,
+        -2.6653521060943604
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 1944576,
+      "componentType": 5126,
+      "count": 24114,
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 328368,
+      "componentType": 5126,
+      "count": 24114,
+      "max": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 690064,
+      "componentType": 5126,
+      "count": 24114,
+      "max": [
+        0.9970700144767761,
+        0.9995120167732239
+      ],
+      "min": [
+        0.0018889999482780695,
+        0.01043699961155653
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 882976,
+      "componentType": 5126,
+      "count": 24114,
+      "max": [
+        0.9864469766616821,
+        0.9985600113868713
+      ],
+      "min": [
+        0.0,
+        0.0
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1075888,
+      "componentType": 5126,
+      "count": 24114,
+      "max": [
+        0.9970700144767761,
+        0.9995120167732239
+      ],
+      "min": [
+        0.0018889999482780695,
+        0.01043699961155653
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1268800,
+      "componentType": 5126,
+      "count": 24114,
+      "max": [
+        0.9970700144767761,
+        0.9995120167732239
+      ],
+      "min": [
+        0.0018889999482780695,
+        0.01043699961155653
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 1027656,
+      "componentType": 5125,
+      "count": 82809,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2233944,
+      "componentType": 5126,
+      "count": 1269,
+      "max": [
+        0.9134799838066101,
+        0.5888199806213379,
+        2.169240951538086
+      ],
+      "min": [
+        -0.9134799838066101,
+        0.07873400300741196,
+        -2.8703389167785645
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2249172,
+      "componentType": 5126,
+      "count": 1269,
+      "max": [
+        1.0,
+        0.9996002316474915,
+        0.9998001456260681
+      ],
+      "min": [
+        -1.0,
+        -0.9996002316474915,
+        -0.9998001456260681
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1461712,
+      "componentType": 5126,
+      "count": 1269,
+      "max": [
+        0.9916989803314209,
+        0.9638670086860657
+      ],
+      "min": [
+        0.009819000028073788,
+        0.007083999924361706
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1471864,
+      "componentType": 5126,
+      "count": 1269,
+      "max": [
+        0.9918359518051147,
+        0.9802380204200745
+      ],
+      "min": [
+        0.009820999577641487,
+        0.012342998757958412
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 1358892,
+      "componentType": 5125,
+      "count": 5022,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2264400,
+      "componentType": 5126,
+      "count": 47,
+      "max": [
+        0.15240000188350677,
+        0.42768800258636475,
+        -2.7857890129089355
+      ],
+      "min": [
+        -0.15240000188350677,
+        0.2806110084056854,
+        -2.8283579349517822
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2264964,
+      "componentType": 5126,
+      "count": 47,
+      "max": [
+        0.9999499917030334,
+        0.965903639793396,
+        0.258901983499527
+      ],
+      "min": [
+        -0.9999499917030334,
+        -0.965903639793396,
+        -0.965903639793396
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1482016,
+      "componentType": 5126,
+      "count": 47,
+      "max": [
+        1.0,
+        1.0
+      ],
+      "min": [
+        0.0,
+        0.0
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 1378980,
+      "componentType": 5125,
+      "count": 192,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2265528,
+      "componentType": 5126,
+      "count": 18752,
+      "max": [
+        0.9758920073509216,
+        1.1637170314788818,
+        2.3170549869537354
+      ],
+      "min": [
+        -0.9758920073509216,
+        -0.008595000021159649,
+        -2.844019889831543
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2490552,
+      "componentType": 5126,
+      "count": 18752,
+      "max": [
+        1.0,
+        1.0,
+        0.9999001026153564
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1482392,
+      "componentType": 5126,
+      "count": 18752,
+      "max": [
+        1.0,
+        1.1855469942092896
+      ],
+      "min": [
+        -1.5185550451278687,
+        -0.17480500042438507
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 1379748,
+      "componentType": 5125,
+      "count": 83166,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2715576,
+      "componentType": 5126,
+      "count": 360,
+      "max": [
+        0.7587289810180664,
+        0.4496319890022278,
+        2.1706349849700928
+      ],
+      "min": [
+        -0.7587289810180664,
+        0.30577200651168823,
+        -2.8703389167785645
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2719896,
+      "componentType": 5126,
+      "count": 360,
+      "max": [
+        0.7383038997650146,
+        0.6222441792488098,
+        0.9998001456260681
+      ],
+      "min": [
+        -0.7383038997650146,
+        -0.9982048869132996,
+        -0.786663830280304
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1632408,
+      "componentType": 5126,
+      "count": 360,
+      "max": [
+        0.0772709995508194,
+        0.07830800116062164
+      ],
+      "min": [
+        0.0,
+        0.0
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 1712412,
+      "componentType": 5125,
+      "count": 1500,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2724216,
+      "componentType": 5126,
+      "count": 501,
+      "max": [
+        0.786907970905304,
+        1.090190052986145,
+        0.723393976688385
+      ],
+      "min": [
+        -0.786907970905304,
+        0.6999480128288269,
+        -1.7162519693374634
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2730228,
+      "componentType": 5126,
+      "count": 501,
+      "max": [
+        0.9626025557518005,
+        0.9647876024246216,
+        0.9851356744766235
+      ],
+      "min": [
+        -0.9626025557518005,
+        -0.6209632754325867,
+        -0.7881892919540405
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1635288,
+      "componentType": 5126,
+      "count": 501,
+      "max": [
+        1.0,
+        1.0
+      ],
+      "min": [
+        0.0,
+        0.0
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 1718412,
+      "componentType": 5125,
+      "count": 1884,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2736240,
+      "componentType": 5126,
+      "count": 508,
+      "max": [
+        0.916592001914978,
+        0.27367299795150757,
+        2.1782119274139404
+      ],
+      "min": [
+        -0.916592001914978,
+        0.08187799900770187,
+        1.7881759405136108
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2742336,
+      "componentType": 5126,
+      "count": 508,
+      "max": [
+        1.0,
+        0.9657121896743774,
+        0.9998001456260681
+      ],
+      "min": [
+        -1.0,
+        -0.9657121896743774,
+        -0.8582851886749268
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1639296,
+      "componentType": 5126,
+      "count": 508,
+      "max": [
+        0.06884799897670746,
+        0.0698850005865097
+      ],
+      "min": [
+        0.028519000858068466,
+        0.029556000605225563
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 1725948,
+      "componentType": 5125,
+      "count": 2274,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2748432,
+      "componentType": 5126,
+      "count": 140,
+      "max": [
+        0.7648259997367859,
+        0.5888199806213379,
+        -2.6862590312957764
+      ],
+      "min": [
+        -0.7648259997367859,
+        0.5463150143623352,
+        -2.6900179386138916
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2750112,
+      "componentType": 5126,
+      "count": 140,
+      "max": [
+        0.8924128413200378,
+        0.9023038744926453,
+        -0.43099245429039
+      ],
+      "min": [
+        -0.8924128413200378,
+        -0.8883580565452576,
+        -0.9998001456260681
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1643360,
+      "componentType": 5126,
+      "count": 140,
+      "max": [
+        0.07635500282049179,
+        0.04922499880194664
+      ],
+      "min": [
+        0.07409700006246567,
+        0.022079000249505043
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 1735044,
+      "componentType": 5125,
+      "count": 618,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2751792,
+      "componentType": 5126,
+      "count": 347,
+      "max": [
+        0.7820529937744141,
+        1.0860459804534912,
+        0.7209259867668152
+      ],
+      "min": [
+        -0.7820529937744141,
+        0.6999480128288269,
+        -1.7134180068969727
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2755956,
+      "componentType": 5126,
+      "count": 347,
+      "max": [
+        0.9535826444625854,
+        -0.30113136768341064,
+        0.6222441792488098
+      ],
+      "min": [
+        -0.9535826444625854,
+        -0.9023038744926453,
+        -0.6555572748184204
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1644480,
+      "componentType": 5126,
+      "count": 347,
+      "max": [
+        1.0,
+        1.0
+      ],
+      "min": [
+        0.0,
+        0.0
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 1737516,
+      "componentType": 5125,
+      "count": 1182,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 7,
+      "max": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "min": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "type": "MAT4"
+    }
+  ],
+  "asset": {
+    "extras": {
+      "author": "Ddiaz Design (https://sketchfab.com/ddiaz-design)",
+      "license": "CC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)",
+      "source": "https://sketchfab.com/3d-models/1970-dodge-charger-rt-fast-furious-cb4c12fc416f456188f3048b9a3bc08d",
+      "title": "1970 Dodge Charger R/T Fast & Furious"
+    },
+    "generator": "Sketchfab-17.15.0",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 1742244,
+      "name": "floatBufferViews",
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1647256,
+      "byteOffset": 1742244,
+      "byteStride": 8,
+      "name": "floatBufferViews",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2760120,
+      "byteOffset": 3389500,
+      "byteStride": 12,
+      "name": "floatBufferViews",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 714192,
+      "byteOffset": 6149620,
+      "byteStride": 16,
+      "name": "floatBufferViews",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 448,
+      "byteOffset": 6863812,
+      "name": "floatBufferViews"
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 6864260,
+      "uri": "scene.bin"
+    }
+  ],
+  "extensionsUsed": [
+    "KHR_materials_specular",
+    "KHR_materials_emissive_strength",
+    "KHR_materials_clearcoat",
+    "KHR_materials_transmission"
+  ],
+  "images": [
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970_Wheel1A_3D_3DWheel1A_Material1_baseColor.png"
+    },
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970_Wheel1A_3D_3DWheel1A_Material1_normal.png"
+    },
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970CalliperGloss_Material1_baseColor.png"
+    },
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970CalliperGloss_Material1_metallicRoughness.png"
+    },
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970CalliperGloss_Material1_normal.png"
+    },
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970Grille1A_Material1_baseColor.png"
+    },
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970Grille1A_Material1_normal.png"
+    },
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970Coloured_Material1_baseColor.png"
+    },
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970InteriorA_Material1_baseColor.png"
+    },
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970InteriorA_Material1_emissive.png"
+    },
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970InteriorA_Material1_normal.png"
+    },
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970LightA_Material1_baseColor.png"
+    },
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970LightA_Material1_emissive.png"
+    },
+    {
+      "uri": "textures/DodgeDodge_ChargerRTF1_1970ManufacturerPlateA_Material1_baseColor.png"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 0.2544769660250393
+        }
+      },
+      "name": "DodgeDodge_ChargerRTF1_1970_Wheel1A_3D_3DWheel1A_Material1",
+      "normalTexture": {
+        "index": 1
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicFactor": 0.7969548097670393,
+        "roughnessFactor": 0.18133388596993819
+      }
+    },
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 0.23009593934000558
+        }
+      },
+      "name": "DodgeDodge_ChargerRTF1_1970CalliperGloss_Material1",
+      "normalTexture": {
+        "index": 4
+      },
+      "occlusionTexture": {
+        "index": 3
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 2
+        },
+        "metallicFactor": 0.6689544196706123,
+        "metallicRoughnessTexture": {
+          "index": 3
+        },
+        "roughnessFactor": 0.35809632943643255
+      }
+    },
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 0.22400068266874718
+        }
+      },
+      "name": "DodgeDodge_ChargerRTF1_1970Grille1A_Material1",
+      "normalTexture": {
+        "index": 6,
+        "texCoord": 1
+      },
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.5470492862454438,
+          0.5470492862454438,
+          0.5470492862454438,
+          1.0
+        ],
+        "baseColorTexture": {
+          "index": 5
+        },
+        "metallicFactor": 0.8335263497945898,
+        "roughnessFactor": 0.49828723287537635
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "DodgeDodge_ChargerRTF1_1970Coloured_Material1",
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 7
+        },
+        "metallicFactor": 0.8457168631371066,
+        "roughnessFactor": 0.1386670892711292
+      }
+    },
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 0.03504772585973595
+        }
+      },
+      "name": "DodgeDodge_ChargerRTF1_1970Base_Material1",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.7360022430544549
+      }
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "emissiveFactor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissiveTexture": {
+        "index": 9,
+        "texCoord": 1
+      },
+      "extensions": {
+        "KHR_materials_emissive_strength": {
+          "emissiveStrength": 2.4838170935378088
+        },
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 0.364191586107691
+        }
+      },
+      "name": "DodgeDodge_ChargerRTF1_1970InteriorA_Material1",
+      "normalTexture": {
+        "index": 10
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 8
+        },
+        "metallicFactor": 0.8457168631371066,
+        "roughnessFactor": 0.32152478940888196
+      }
+    },
+    {
+      "doubleSided": true,
+      "emissiveFactor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissiveTexture": {
+        "index": 12,
+        "texCoord": 1
+      },
+      "extensions": {
+        "KHR_materials_emissive_strength": {
+          "emissiveStrength": 3.2152478940888196
+        }
+      },
+      "name": "DodgeDodge_ChargerRTF1_1970LightA_Material1",
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 11
+        },
+        "metallicFactor": 0.3337153027513988,
+        "roughnessFactor": 0.10209554924357864
+      }
+    },
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 0.0
+        }
+      },
+      "name": "DodgeDodge_ChargerRTF1_1970ManufacturerPlateA_Material1",
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 13
+        },
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.7725737830820055
+      }
+    },
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 0.6994307030269045
+        }
+      },
+      "name": "DodgeDodge_ChargerRTF1_1970Paint_Material1",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "metallicFactor": 0.5165730028891516,
+        "roughnessFactor": 0.03504772585973595
+      }
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_clearcoat": {
+          "clearcoatFactor": 1.0,
+          "clearcoatRoughnessFactor": 0.0
+        },
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 1.0
+        }
+      },
+      "name": "Glass_light",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.0,
+          0.0,
+          0.0,
+          0.4556204361765674
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.0
+      }
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 0.7969548097670393
+        },
+        "KHR_materials_transmission": {
+          "transmissionFactor": 1.0
+        }
+      },
+      "name": "DodgeDodge_ChargerRTF1_1970Window_Material1",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.0,
+          0.0,
+          0.0,
+          0.25
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.0
+      }
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 1.0
+        },
+        "KHR_materials_transmission": {
+          "transmissionFactor": 1.0
+        }
+      },
+      "name": "orange_glass",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.5,
+          0.115383,
+          0.0,
+          0.25
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.0
+      }
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 1.0
+        },
+        "KHR_materials_transmission": {
+          "transmissionFactor": 1.0
+        }
+      },
+      "name": "red_glass",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.5,
+          0.0,
+          0.0,
+          0.25
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.0
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "polySurface1_Dodge:Dodge_ChargerRTF1_1970_Wheel1A_3D_3DWheel1A_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 1,
+            "POSITION": 0,
+            "TANGENT": 2,
+            "TEXCOORD_0": 3,
+            "TEXCOORD_1": 4
+          },
+          "indices": 5,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "polySurface114_Dodge:Dodge_ChargerRTF1_1970_Wheel1A_3D_3DWheel1A_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 7,
+            "POSITION": 6,
+            "TANGENT": 8,
+            "TEXCOORD_0": 9,
+            "TEXCOORD_1": 10
+          },
+          "indices": 11,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "polySurface227_Dodge:Dodge_ChargerRTF1_1970_Wheel1A_3D_3DWheel1A_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 13,
+            "POSITION": 12,
+            "TANGENT": 14,
+            "TEXCOORD_0": 15,
+            "TEXCOORD_1": 16
+          },
+          "indices": 17,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "polySurface345_Dodge:Dodge_ChargerRTF1_1970_Wheel1A_3D_3DWheel1A_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 19,
+            "POSITION": 18,
+            "TANGENT": 20,
+            "TEXCOORD_0": 21,
+            "TEXCOORD_1": 22
+          },
+          "indices": 23,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "polySurface346_Dodge:Dodge_ChargerRTF1_1970CalliperGloss_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 25,
+            "POSITION": 24,
+            "TANGENT": 26,
+            "TEXCOORD_0": 27,
+            "TEXCOORD_1": 28
+          },
+          "indices": 29,
+          "material": 1,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "polySurface378_Dodge:Dodge_ChargerRTF1_1970CalliperGloss_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 31,
+            "POSITION": 30,
+            "TANGENT": 32,
+            "TEXCOORD_0": 33,
+            "TEXCOORD_1": 34
+          },
+          "indices": 35,
+          "material": 1,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "polySurface410_Dodge:Dodge_ChargerRTF1_1970CalliperGloss_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 37,
+            "POSITION": 36,
+            "TANGENT": 38,
+            "TEXCOORD_0": 39,
+            "TEXCOORD_1": 40
+          },
+          "indices": 41,
+          "material": 1,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "polySurface469_Dodge:Dodge_ChargerRTF1_1970CalliperGloss_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 43,
+            "POSITION": 42,
+            "TANGENT": 44,
+            "TEXCOORD_0": 45,
+            "TEXCOORD_1": 46
+          },
+          "indices": 47,
+          "material": 1,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Dodge:Grille1_Geo_lodA_Grille1_Geo_lodA_Dodge_ChargerRTF1_1970Grille1A_Material_Dodge:Dodge_ChargerRTF1_1970Grille1A_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 49,
+            "POSITION": 48,
+            "TANGENT": 50,
+            "TEXCOORD_0": 51,
+            "TEXCOORD_1": 52
+          },
+          "indices": 53,
+          "material": 2,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Dodge:Coloured_Geo_lodA_Coloured_Geo_lodA_Dodge_ChargerRTF1_1970Coloured_Material_Dodge:Dodge_ChargerRTF1_1970Coloured_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 55,
+            "POSITION": 54,
+            "TEXCOORD_0": 56
+          },
+          "indices": 57,
+          "material": 3,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Dodge:Base_Geo_lodA_Base_Geo_lodA_Dodge_ChargerRTF1_1970Base_Material_Dodge:Dodge_ChargerRTF1_1970Base_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 59,
+            "POSITION": 58
+          },
+          "indices": 60,
+          "material": 4,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Dodge:Interior_Geo_lodA_Interior_Geo_lodA_Dodge_ChargerRTF1_1970InteriorA_Material_Dodge:Dodge_ChargerRTF1_1970InteriorA_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 62,
+            "POSITION": 61,
+            "TANGENT": 63,
+            "TEXCOORD_0": 64,
+            "TEXCOORD_1": 65,
+            "TEXCOORD_2": 66,
+            "TEXCOORD_3": 67
+          },
+          "indices": 68,
+          "material": 5,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Dodge:Light_Geo_lodA_Light_Geo_lodA_Dodge_ChargerRTF1_1970LightA_Material_Dodge:Dodge_ChargerRTF1_1970LightA_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 70,
+            "POSITION": 69,
+            "TEXCOORD_0": 71,
+            "TEXCOORD_1": 72
+          },
+          "indices": 73,
+          "material": 6,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Dodge:ManufacturerPlate_Geo_lodA_ManufacturerPlate_Geo_lodA_Dodge_ChargerRTF1_1970ManufacturerPlateA_Material_Dodge:Dodge_ChargerRTF1_1970ManufacturerPlateA_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 75,
+            "POSITION": 74,
+            "TEXCOORD_0": 76
+          },
+          "indices": 77,
+          "material": 7,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Dodge:Paint_Geo_lodA_Paint_Geo_lodA_Dodge_ChargerRTF1_1970Paint_Material_Dodge:Dodge_ChargerRTF1_1970Paint_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 79,
+            "POSITION": 78,
+            "TEXCOORD_0": 80
+          },
+          "indices": 81,
+          "material": 8,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Dodge:Window_Geo_lodA_Window_Geo_lodA_Dodge_ChargerRTF1_1970Window_Material_Glass_light_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 83,
+            "POSITION": 82,
+            "TEXCOORD_0": 84
+          },
+          "indices": 85,
+          "material": 9,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Dodge:Window_Geo_lodA_Window_Geo_lodA_Dodge_ChargerRTF1_1970Window_Material_Dodge:Dodge_ChargerRTF1_1970Window_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 87,
+            "POSITION": 86,
+            "TEXCOORD_0": 88
+          },
+          "indices": 89,
+          "material": 10,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Dodge:Window_Geo_lodA_Window_Geo_lodA_Dodge_ChargerRTF1_1970Window_Material_orange_glass_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 91,
+            "POSITION": 90,
+            "TEXCOORD_0": 92
+          },
+          "indices": 93,
+          "material": 11,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Dodge:Window_Geo_lodA_Window_Geo_lodA_Dodge_ChargerRTF1_1970Window_Material_red_glass_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 95,
+            "POSITION": 94,
+            "TEXCOORD_0": 96
+          },
+          "indices": 97,
+          "material": 12,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Dodge:WindowInside_Geo_lodA_WindowInside_Geo_lodA_Dodge_ChargerRTF1_1970WindowInside_Material_Dodge:Dodge_ChargerRTF1_1970Window_Material1_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 99,
+            "POSITION": 98,
+            "TEXCOORD_0": 100
+          },
+          "indices": 101,
+          "material": 10,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "children": [
+        1
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        2.220446049250313e-16,
+        -1.0,
+        0.0,
+        0.0,
+        1.0,
+        2.220446049250313e-16,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Sketchfab_model"
+    },
+    {
+      "children": [
+        2
+      ],
+      "matrix": [
+        0.009999999776482582,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.009999999776482582,
+        0.0,
+        0.0,
+        -0.009999999776482582,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "FINAL_MODEL_toretto.fbx"
+    },
+    {
+      "children": [
+        3
+      ],
+      "name": "RootNode"
+    },
+    {
+      "children": [
+        4,
+        35,
+        37,
+        39,
+        41,
+        43,
+        45,
+        47,
+        49,
+        54
+      ],
+      "name": "Object_3"
+    },
+    {
+      "children": [
+        5,
+        18
+      ],
+      "name": "_rootJoint"
+    },
+    {
+      "children": [
+        6,
+        9,
+        12,
+        15
+      ],
+      "name": "Wheel1A_3D_00"
+    },
+    {
+      "children": [
+        7
+      ],
+      "matrix": [
+        0.9998476976437108,
+        0.01745226393825972,
+        0.0,
+        0.0,
+        -0.01745226393825972,
+        0.9998476976437108,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.7639999985694885,
+        0.33500000834465027,
+        1.3660000562667847,
+        1.0
+      ],
+      "name": "3DWheel Front L"
+    },
+    {
+      "children": [
+        8
+      ],
+      "name": "polySurface1"
+    },
+    {
+      "mesh": 0,
+      "name": "polySurface1_Dodge:Dodge_ChargerRTF1_1970_Wheel1A_3D_3DWheel1A_Material1_0"
+    },
+    {
+      "children": [
+        10
+      ],
+      "matrix": [
+        -0.9998476998040551,
+        0.017452140161732577,
+        5.616749515717694e-07,
+        0.0,
+        0.01745214016173533,
+        0.9998476998042127,
+        -1.224646794682525e-16,
+        0.0,
+        -5.615894083688136e-07,
+        9.802429857720397e-09,
+        -0.9999999999998423,
+        0.0,
+        -0.7639999985694885,
+        0.33500000834465027,
+        1.3660000562667847,
+        1.0
+      ],
+      "name": "3DWheel Front R"
+    },
+    {
+      "children": [
+        11
+      ],
+      "matrix": [
+        1.0,
+        -6.878534244497638e-23,
+        -2.117582368135751e-22,
+        0.0,
+        6.878534244497638e-23,
+        1.0,
+        -2.5911132368876974e-25,
+        0.0,
+        2.117582368135751e-22,
+        2.5911132368876974e-25,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "polySurface114"
+    },
+    {
+      "mesh": 1,
+      "name": "polySurface114_Dodge:Dodge_ChargerRTF1_1970_Wheel1A_3D_3DWheel1A_Material1_0"
+    },
+    {
+      "children": [
+        13
+      ],
+      "matrix": [
+        0.9998476943938512,
+        -0.017452450123115554,
+        0.0,
+        0.0,
+        0.017452450123115554,
+        0.9998476943938512,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.8051999807357788,
+        0.335999995470047,
+        -1.5579999685287476,
+        1.0
+      ],
+      "name": "3DWheel Rear L"
+    },
+    {
+      "children": [
+        14
+      ],
+      "name": "polySurface227"
+    },
+    {
+      "mesh": 2,
+      "name": "polySurface227_Dodge:Dodge_ChargerRTF1_1970_Wheel1A_3D_3DWheel1A_Material1_0"
+    },
+    {
+      "children": [
+        16
+      ],
+      "matrix": [
+        -0.9998476951562336,
+        -0.01745240643728069,
+        -5.616749515717693e-07,
+        0.0,
+        -0.017452406437283446,
+        0.9998476951563913,
+        -1.224646802954331e-16,
+        0.0,
+        5.615894057582486e-07,
+        9.802579418025985e-09,
+        -0.9999999999998423,
+        0.0,
+        -0.8051999807357788,
+        0.335999995470047,
+        -1.5579999685287476,
+        1.0
+      ],
+      "name": "3DWheel Rear R"
+    },
+    {
+      "children": [
+        17
+      ],
+      "matrix": [
+        1.0,
+        6.878534244497634e-23,
+        -1.0587911840678757e-22,
+        0.0,
+        -6.878534244497634e-23,
+        1.0,
+        3.049611027915728e-24,
+        0.0,
+        1.0587911840678757e-22,
+        -3.049611027915728e-24,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "polySurface345"
+    },
+    {
+      "mesh": 3,
+      "name": "polySurface345_Dodge:Dodge_ChargerRTF1_1970_Wheel1A_3D_3DWheel1A_Material1_0"
+    },
+    {
+      "children": [
+        19,
+        23,
+        27,
+        31
+      ],
+      "name": "Common_01"
+    },
+    {
+      "children": [
+        20
+      ],
+      "name": "Calliper Front L_02",
+      "rotation": [
+        0.0,
+        0.0,
+        0.008726637810468674,
+        0.9999619126319885
+      ],
+      "translation": [
+        0.7639999985694885,
+        0.33500000834465027,
+        1.3660000562667847
+      ]
+    },
+    {
+      "children": [
+        21
+      ],
+      "matrix": [
+        0.7790963053703308,
+        1.7347234759768075e-18,
+        0.0,
+        0.0,
+        -1.6119454279940517e-18,
+        0.7239544197103797,
+        -0.002868256778935416,
+        0.0,
+        -6.3864150493998296e-21,
+        0.002868256778935416,
+        0.7239544197103797,
+        0.0,
+        0.007400000002235174,
+        0.003700000001117587,
+        -0.10980000346899033,
+        1.0
+      ],
+      "name": "CalliperBody Front L"
+    },
+    {
+      "children": [
+        22
+      ],
+      "matrix": [
+        1.2000000476837158,
+        -3.46944708981705e-18,
+        -1.355252769459785e-20,
+        0.0,
+        3.46944708981705e-18,
+        1.2000000476837158,
+        -8.673617724542623e-19,
+        0.0,
+        1.3552527694597854e-20,
+        8.673617724542623e-19,
+        1.2000000476837158,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "polySurface346"
+    },
+    {
+      "mesh": 4,
+      "name": "polySurface346_Dodge:Dodge_ChargerRTF1_1970CalliperGloss_Material1_0"
+    },
+    {
+      "children": [
+        24
+      ],
+      "name": "Calliper Front R_03",
+      "rotation": [
+        0.008726668544113636,
+        0.9999619126319885,
+        2.739027671339045e-09,
+        -3.138567024052463e-07
+      ],
+      "translation": [
+        -0.7639999985694885,
+        0.33500000834465027,
+        1.3660000562667847
+      ]
+    },
+    {
+      "children": [
+        25
+      ],
+      "matrix": [
+        0.7790963053703308,
+        1.1219560887794026e-13,
+        -5.6686605144594704e-11,
+        -0.0,
+        1.0430914943929937e-13,
+        0.7239544267224762,
+        0.0028664863636834403,
+        -0.0,
+        -5.267492613506132e-11,
+        0.0028664863636834403,
+        -0.7239544267224762,
+        -0.0,
+        0.007400000002235174,
+        0.003700000001117587,
+        0.10980000346899033,
+        1.0
+      ],
+      "name": "CalliperBody Front R"
+    },
+    {
+      "children": [
+        26
+      ],
+      "matrix": [
+        1.2000000476837158,
+        1.8282793302670704e-18,
+        4.97631876286015e-21,
+        0.0,
+        -1.8282793302670704e-18,
+        1.2000000476837158,
+        8.673617724542623e-19,
+        0.0,
+        -4.9763187628601476e-21,
+        -8.673617724542623e-19,
+        1.2000000476837158,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "polySurface378"
+    },
+    {
+      "mesh": 5,
+      "name": "polySurface378_Dodge:Dodge_ChargerRTF1_1970CalliperGloss_Material1_0"
+    },
+    {
+      "children": [
+        28
+      ],
+      "name": "Calliper Rear L_04",
+      "rotation": [
+        0.0,
+        -0.0,
+        -0.008726558648049831,
+        0.9999619126319885
+      ],
+      "translation": [
+        0.8051999807357788,
+        0.335999995470047,
+        -1.5579999685287476
+      ]
+    },
+    {
+      "children": [
+        29
+      ],
+      "matrix": [
+        0.8333247900009155,
+        1.0205285367247615e-16,
+        -0.0,
+        -0.0,
+        -1.0190215039357392e-16,
+        0.8320942043413838,
+        0.045268554775379444,
+        -0.0,
+        -5.543799070769506e-18,
+        0.045268554775379444,
+        -0.8320942043413836,
+        -0.0,
+        -0.050200000405311584,
+        0.003100000089034438,
+        0.1071000024676323,
+        1.0
+      ],
+      "name": "CalliperBody Rear L"
+    },
+    {
+      "children": [
+        30
+      ],
+      "matrix": [
+        1.2000000476837158,
+        9.257618838471402e-21,
+        -3.870073728889175e-19,
+        0.0,
+        -9.257618838471399e-21,
+        1.2000000476837158,
+        1.38777883592682e-17,
+        0.0,
+        3.870073728889175e-19,
+        -1.38777883592682e-17,
+        1.2000000476837158,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "polySurface410"
+    },
+    {
+      "mesh": 6,
+      "name": "polySurface410_Dodge:Dodge_ChargerRTF1_1970CalliperGloss_Material1_0"
+    },
+    {
+      "children": [
+        32
+      ],
+      "name": "Calliper Rear R_05",
+      "rotation": [
+        -0.008726535364985466,
+        0.9999619126319885,
+        2.4616422233947333e-09,
+        2.8207628588461375e-07
+      ],
+      "translation": [
+        -0.8051999807357788,
+        0.335999995470047,
+        -1.5579999685287476
+      ]
+    },
+    {
+      "children": [
+        33
+      ],
+      "matrix": [
+        0.8333247900009148,
+        3.4828712752385606e-08,
+        -1.2917232474870238e-09,
+        0.0,
+        -3.484745532793372e-08,
+        0.832094558265097,
+        -0.045262048733829115,
+        0.0,
+        -6.019057814372592e-10,
+        0.04526204873382913,
+        0.8320945582650978,
+        0.0,
+        -0.050200000405311584,
+        0.003100000089034438,
+        -0.1071000024676323,
+        1.0
+      ],
+      "name": "CalliperBody Rear R"
+    },
+    {
+      "children": [
+        34
+      ],
+      "matrix": [
+        1.2000000476837158,
+        1.5582098126205837e-18,
+        -1.2123159539308232e-19,
+        0.0,
+        -1.5582098126205837e-18,
+        1.2000000476837158,
+        0.0,
+        0.0,
+        1.2123159539308232e-19,
+        1.5742021169564046e-37,
+        1.2000000476837158,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "polySurface469"
+    },
+    {
+      "mesh": 7,
+      "name": "polySurface469_Dodge:Dodge_ChargerRTF1_1970CalliperGloss_Material1_0"
+    },
+    {
+      "children": [
+        36
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.24198734760284424,
+        0.0,
+        1.0
+      ],
+      "name": "Dodge:Grille1_Geo_lodA_Grille1_Geo_lodA_Dodge_ChargerRTF1_1970Grille1A_Material"
+    },
+    {
+      "mesh": 8,
+      "name": "Dodge:Grille1_Geo_lodA_Grille1_Geo_lodA_Dodge_ChargerRTF1_1970Grille1A_Material_Dodge:Dodge_ChargerRTF1_1970Grille1A_Material1_0"
+    },
+    {
+      "children": [
+        38
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.24198734760284424,
+        0.0,
+        1.0
+      ],
+      "name": "Dodge:Coloured_Geo_lodA_Coloured_Geo_lodA_Dodge_ChargerRTF1_1970Coloured_Material"
+    },
+    {
+      "mesh": 9,
+      "name": "Dodge:Coloured_Geo_lodA_Coloured_Geo_lodA_Dodge_ChargerRTF1_1970Coloured_Material_Dodge:Dodge_ChargerRTF1_1970Coloured_Material1_0"
+    },
+    {
+      "children": [
+        40
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.24198734760284424,
+        0.0,
+        1.0
+      ],
+      "name": "Dodge:Base_Geo_lodA_Base_Geo_lodA_Dodge_ChargerRTF1_1970Base_Material"
+    },
+    {
+      "mesh": 10,
+      "name": "Dodge:Base_Geo_lodA_Base_Geo_lodA_Dodge_ChargerRTF1_1970Base_Material_Dodge:Dodge_ChargerRTF1_1970Base_Material1_0"
+    },
+    {
+      "children": [
+        42
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.24198734760284424,
+        0.0,
+        1.0
+      ],
+      "name": "Dodge:Interior_Geo_lodA_Interior_Geo_lodA_Dodge_ChargerRTF1_1970InteriorA_Material"
+    },
+    {
+      "mesh": 11,
+      "name": "Dodge:Interior_Geo_lodA_Interior_Geo_lodA_Dodge_ChargerRTF1_1970InteriorA_Material_Dodge:Dodge_ChargerRTF1_1970InteriorA_Material1_0"
+    },
+    {
+      "children": [
+        44
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.24198734760284424,
+        0.0,
+        1.0
+      ],
+      "name": "Dodge:Light_Geo_lodA_Light_Geo_lodA_Dodge_ChargerRTF1_1970LightA_Material"
+    },
+    {
+      "mesh": 12,
+      "name": "Dodge:Light_Geo_lodA_Light_Geo_lodA_Dodge_ChargerRTF1_1970LightA_Material_Dodge:Dodge_ChargerRTF1_1970LightA_Material1_0"
+    },
+    {
+      "children": [
+        46
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.24198734760284424,
+        0.0,
+        1.0
+      ],
+      "name": "Dodge:ManufacturerPlate_Geo_lodA_ManufacturerPlate_Geo_lodA_Dodge_ChargerRTF1_1970ManufacturerPlateA_Material"
+    },
+    {
+      "mesh": 13,
+      "name": "Dodge:ManufacturerPlate_Geo_lodA_ManufacturerPlate_Geo_lodA_Dodge_ChargerRTF1_1970ManufacturerPlateA_Material_Dodge:Dodge_ChargerRTF1_1970ManufacturerPlateA_Material1_0"
+    },
+    {
+      "children": [
+        48
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.24198734760284424,
+        0.0,
+        1.0
+      ],
+      "name": "Dodge:Paint_Geo_lodA_Paint_Geo_lodA_Dodge_ChargerRTF1_1970Paint_Material"
+    },
+    {
+      "mesh": 14,
+      "name": "Dodge:Paint_Geo_lodA_Paint_Geo_lodA_Dodge_ChargerRTF1_1970Paint_Material_Dodge:Dodge_ChargerRTF1_1970Paint_Material1_0"
+    },
+    {
+      "children": [
+        50,
+        51,
+        52,
+        53
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.24198734760284424,
+        0.0,
+        1.0
+      ],
+      "name": "Dodge:Window_Geo_lodA_Window_Geo_lodA_Dodge_ChargerRTF1_1970Window_Material"
+    },
+    {
+      "mesh": 15,
+      "name": "Dodge:Window_Geo_lodA_Window_Geo_lodA_Dodge_ChargerRTF1_1970Window_Material_Glass_light_0"
+    },
+    {
+      "mesh": 16,
+      "name": "Dodge:Window_Geo_lodA_Window_Geo_lodA_Dodge_ChargerRTF1_1970Window_Material_Dodge:Dodge_ChargerRTF1_1970Window_Material1_0"
+    },
+    {
+      "mesh": 17,
+      "name": "Dodge:Window_Geo_lodA_Window_Geo_lodA_Dodge_ChargerRTF1_1970Window_Material_orange_glass_0"
+    },
+    {
+      "mesh": 18,
+      "name": "Dodge:Window_Geo_lodA_Window_Geo_lodA_Dodge_ChargerRTF1_1970Window_Material_red_glass_0"
+    },
+    {
+      "children": [
+        55
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.24198734760284424,
+        0.0,
+        1.0
+      ],
+      "name": "Dodge:WindowInside_Geo_lodA_WindowInside_Geo_lodA_Dodge_ChargerRTF1_1970WindowInside_Material"
+    },
+    {
+      "mesh": 19,
+      "name": "Dodge:WindowInside_Geo_lodA_WindowInside_Geo_lodA_Dodge_ChargerRTF1_1970WindowInside_Material_Dodge:Dodge_ChargerRTF1_1970Window_Material1_0"
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Sketchfab_Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "skins": [
+    {
+      "inverseBindMatrices": 102,
+      "joints": [
+        4,
+        5,
+        18,
+        19,
+        23,
+        27,
+        31
+      ],
+      "skeleton": 4
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    },
+    {
+      "sampler": 0,
+      "source": 3
+    },
+    {
+      "sampler": 0,
+      "source": 4
+    },
+    {
+      "sampler": 0,
+      "source": 5
+    },
+    {
+      "sampler": 0,
+      "source": 6
+    },
+    {
+      "sampler": 0,
+      "source": 7
+    },
+    {
+      "sampler": 0,
+      "source": 8
+    },
+    {
+      "sampler": 0,
+      "source": 9
+    },
+    {
+      "sampler": 0,
+      "source": 10
+    },
+    {
+      "sampler": 0,
+      "source": 11
+    },
+    {
+      "sampler": 0,
+      "source": 12
+    },
+    {
+      "sampler": 0,
+      "source": 13
+    }
+  ]
+}

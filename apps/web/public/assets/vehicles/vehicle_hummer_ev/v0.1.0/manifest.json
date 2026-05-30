@@ -1,0 +1,66 @@
+{
+  "id": "vehicle_hummer_ev",
+  "displayName": "GMC Hummer EV",
+  "version": "0.1.0",
+  "visualMesh": "model/scene.gltf",
+  "proxyMesh": "model/scene.gltf",
+  "skinning": "",
+  "preview": "preview.jpg",
+  "rig": {
+    "wheels": [
+      { "position": [0.939, 0.45, 1.658], "radius": 0.45, "isDriven": true, "isSteered": true },
+      { "position": [-0.939, 0.45, 1.658], "radius": 0.45, "isDriven": true, "isSteered": true },
+      { "position": [0.931, 0.45, -1.658], "radius": 0.45, "isDriven": true, "isSteered": false },
+      { "position": [-0.931, 0.45, -1.658], "radius": 0.45, "isDriven": true, "isSteered": false }
+    ],
+    "seat": [0.45, 1.1, 0.2]
+  },
+  "mass": 4100,
+  "inertiaTensor": [6500, 8000, 3000],
+  "engine": {
+    "powerCurveHpAtRpm": [
+      [0, 250],
+      [1500, 830],
+      [7000, 830],
+      [11000, 650]
+    ],
+    "redline": 11000
+  },
+  "gearbox": {
+    "ratios": [1.0],
+    "final": 10.5,
+    "type": "automatic"
+  },
+  "visual": {
+    "format": "glb",
+    "glb": "model/scene.gltf",
+    "scale": 1.0065,
+    "yaw": 0,
+    "wheels": {
+      "fl": ["Wheel_FL"],
+      "fr": ["Wheel_FR"],
+      "rl": ["Wheel_RL"],
+      "rr": ["Wheel_RR"]
+    }
+  },
+  "tuning": {
+    "driveAccelG": 0.5,
+    "brakeDecelG": 0.7,
+    "reverseAccelG": 0.45,
+    "maxSteerDeg": 30,
+    "steerSpeedScale": 16,
+    "frontBrakeBias": 0.55,
+    "suspensionStiffnessScale": 1.0,
+    "suspensionTravelScale": 1.3,
+    "gripScale": 1.1,
+    "comHeightScale": 0.8,
+    "rideHeight": 0.45
+  },
+  "audio": {
+    "kind": "electric",
+    "idleHz": 120,
+    "revHz": 900,
+    "gain": 0.4
+  },
+  "credits": "This work is based on \"2024 GMC Hummer EV SUV\" (https://sketchfab.com/3d-models/2024-gmc-hummer-ev-suv-7cd584fc9ba54acd9002d4286a08e419) by Ddiaz Design (https://sketchfab.com/ddiaz-design) licensed under CC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)"
+}

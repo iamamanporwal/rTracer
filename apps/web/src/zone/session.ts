@@ -1,35 +1,50 @@
 import * as THREE from 'three';
 import {
   createEventBus,
+  vehicleBundleDir,
   type EventBus,
   type VehicleManifest,
   type ZoneManifest,
 } from '@trace/core';
 import {
   createGround,
+  createObstacleField,
   createPhysicsWorld,
   createVehicle,
   initRapier,
   PHYSICS_PROFILES,
+  type ObstacleField,
   type PhysicsWorld,
   type VehicleHandle,
+  type VehicleSnapshot,
 } from '@trace/physics';
 import {
-  applyWeather,
   CAMERA_MODES,
   createCameraRig,
+  createEngineAudio,
+  createEnvironmentMap,
+  createGlbVehicleVisual,
   createGroundVisual,
+  createObstacleVisuals,
+  createPhysicsDebug,
   createRenderer,
   createScene,
   createSurfaceMaterials,
+  createTireFx,
   createVehicleVisual,
+  createWeatherSystem,
   disposeSurfaceMaterials,
-  WEATHER_PRESETS,
   type CameraRig,
+  type EngineAudio,
+  type EnvironmentMap,
   type GroundVisual,
+  type ObstacleVisuals,
+  type PhysicsDebug,
   type SceneBundle,
   type SurfaceMaterials,
+  type TireFx,
   type VehicleVisual,
+  type WeatherSystem,
 } from '@trace/renderer';
 import { createKeyboardInput, type InputDriver } from './input';
 import { createCameraInput, type CameraInputDriver } from './camera-input';
@@ -60,16 +75,36 @@ export type SessionInit = {
   onWeather?: (label: string) => void;
   /** Called with the current camera-mode label on init and each C-key cycle. */
   onCameraMode?: (label: string) => void;
+  /**
+   * Called with the new state whenever the "invisible skeleton" (physics
+   * debug overlay) is toggled — either via the O key or the HUD checkbox.
+   * Lets the HUD keep its checkbox in sync with the runtime.
+   */
+  onSkeleton?: (enabled: boolean) => void;
 };
 
 export type ZoneSession = {
   readonly bus: EventBus;
+  /**
+   * Show or hide the physics-debug "invisible skeleton" overlay — colliders,
+   * suspension rays, wheel contacts, COM, velocity arrow. Fires {@link
+   * SessionInit.onSkeleton} so any external UI stays in sync.
+   */
+  setSkeleton(enabled: boolean): void;
   dispose(): void;
 };
 
 export async function startZoneSession(init: SessionInit): Promise<ZoneSession> {
-  const { canvas, zoneManifest, vehicleManifest, liveryColor, onStats, onWeather, onCameraMode } =
-    init;
+  const {
+    canvas,
+    zoneManifest,
+    vehicleManifest,
+    liveryColor,
+    onStats,
+    onWeather,
+    onCameraMode,
+    onSkeleton,
+  } = init;
 
   await initRapier();
 
@@ -80,6 +115,9 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   // Ground (W4 will swap this for the zone's collider asset).
   createGround(physics.world, { tag: 'tarmac' });
 
+  // Spawn-area obstacle field — speed bump straight ahead + a few crates.
+  const obstacles: ObstacleField = createObstacleField(physics.world);
+
   // Vehicle.
   const spawn = pickSpawn(zoneManifest);
   const vehicle: VehicleHandle = createVehicle(physics.world, {
@@ -88,34 +126,94 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
     spawn,
   });
 
-  // Renderer + scene.
+  // Renderer + scene + image-based lighting (so car paint/chrome reflects).
   const renderer = createRenderer(canvas);
   const sceneBundle: SceneBundle = createScene();
+  const environment: EnvironmentMap = createEnvironmentMap(renderer);
+  sceneBundle.scene.environment = environment.texture;
   const materials: SurfaceMaterials = createSurfaceMaterials();
   const ground: GroundVisual = createGroundVisual(materials);
   sceneBundle.scene.add(ground.group);
 
-  const vehicleVisual: VehicleVisual = createVehicleVisual({
-    manifest: vehicleManifest,
-    liveryColor,
-  });
+  // Obstacle visuals mirror the physics field. Initial snapshot positions the
+  // meshes; `obstacleVisuals.update` syncs the dynamic crates each render frame.
+  const obstacleVisuals: ObstacleVisuals = createObstacleVisuals(obstacles.readSnapshot());
+  sceneBundle.scene.add(obstacleVisuals.group);
+
+  // Vehicle visual: a rigged GLB when the manifest declares one, else the
+  // procedural demo body. Both honour the same applySnapshot contract.
+  let vehicleVisual: VehicleVisual;
+  if (vehicleManifest.visual?.format === 'glb' && vehicleManifest.visual.glb) {
+    const url = `${vehicleBundleDir(vehicleManifest.id, vehicleManifest.version)}/${vehicleManifest.visual.glb}`;
+    vehicleVisual = await createGlbVehicleVisual({
+      url,
+      manifest: vehicleManifest,
+      restHubLocalY: vehicle.restHubLocalY,
+      environment: environment.texture,
+    });
+  } else {
+    vehicleVisual = createVehicleVisual({ manifest: vehicleManifest, liveryColor });
+  }
   sceneBundle.scene.add(vehicleVisual.group);
 
-  // Weather / lighting conditions — press Y to cycle. Future rain/ice/wind and
-  // their physics hooks extend WEATHER_PRESETS (see @trace/renderer scene.ts).
+  // Tire ground-contact FX — per-wheel skid marks + shared smoke pool. Reads
+  // per-wheel `slip`/`contact` from the physics snapshot each render frame,
+  // so handbrake yanks, burnouts, and ABS-locked panic stops all draw through
+  // the same seam without the renderer knowing why a tire is sliding.
+  const tireFx: TireFx = createTireFx({ wheelCount: vehicle.wheelCount });
+  sceneBundle.scene.add(tireFx.group);
+
+  // Physics debug overlay — the "invisible skeleton" that makes the tire and
+  // chassis physics visible (colliders, suspension rays, wheel contacts, COM,
+  // velocity). Off by default. Toggles from two surfaces:
+  //   - O key (legacy keyboard shortcut)
+  //   - HUD checkbox via `session.setSkeleton(...)`
+  // Either path goes through `setSkeleton`, which fires `onSkeleton` so the
+  // React HUD always sees the current state regardless of how it flipped.
+  const debug: PhysicsDebug = createPhysicsDebug(sceneBundle.scene);
+  const setSkeleton = (on: boolean): void => {
+    if (debug.enabled === on) return;
+    debug.setEnabled(on);
+    onSkeleton?.(on);
+  };
+  const onDebugKey = (e: KeyboardEvent): void => {
+    if (e.code === 'KeyO' && !e.repeat) setSkeleton(!debug.enabled);
+  };
+  window.addEventListener('keydown', onDebugKey);
+  // Emit the initial state so the HUD checkbox starts in sync.
+  onSkeleton?.(debug.enabled);
+
+  // Procedural engine audio — resumes on the first user gesture (autoplay).
+  const engineAudio: EngineAudio = createEngineAudio(vehicleManifest);
+  const resumeAudio = (): void => engineAudio.resume();
+  window.addEventListener('pointerdown', resumeAudio);
+  window.addEventListener('keydown', resumeAudio);
+  engineAudio.resume();
+
+  // Weather system — anime sky + clouds + rain + lighting. One seam owns all of
+  // it so a preset change is atomic across sky / rain / lighting. Wetness flows
+  // into the car's grip multiplier each render frame so wet roads are slippery
+  // without mutating the zone's authoritative physics profile (Blueprint §6.3).
+  const weather: WeatherSystem = createWeatherSystem({
+    scene: sceneBundle.scene,
+    sun: sceneBundle.sun,
+    ambient: sceneBundle.ambient,
+  });
   let weatherIndex = 0;
   const setWeather = (index: number): void => {
-    weatherIndex = ((index % WEATHER_PRESETS.length) + WEATHER_PRESETS.length) % WEATHER_PRESETS.length;
-    const preset = WEATHER_PRESETS[weatherIndex];
-    if (!preset) return;
-    applyWeather(sceneBundle, preset);
-    onWeather?.(preset.label);
+    const len = weather.presets.length;
+    weatherIndex = ((index % len) + len) % len;
+    weather.applyPreset(weatherIndex);
+    onWeather?.(weather.current.label);
   };
   setWeather(0);
   const onWeatherKey = (e: KeyboardEvent): void => {
     if (e.code === 'KeyY' && !e.repeat) setWeather(weatherIndex + 1);
   };
   window.addEventListener('keydown', onWeatherKey);
+
+  /** Wet-road grip cut: full rain → 70% grip. Slippery but still driveable. */
+  const wetnessToGrip = (w: number): number => 1 - w * 0.3;
 
   // Camera.
   const rig: CameraRig = createCameraRig({ seat: vehicleManifest.rig.seat });
@@ -165,51 +263,122 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   // Scratch buffers for camera follow — alloc-free per frame.
   const camTargetPos = new THREE.Vector3();
   const camTargetQuat = new THREE.Quaternion();
+  // Quaternion scratch for slerp (Three's `slerpQuaternions` writes in-place).
+  const prevQuat = new THREE.Quaternion();
+  const currQuat = new THREE.Quaternion();
+
+  // Render-side snapshot interpolation — eliminates camera/visual jitter when
+  // rAF doesn't perfectly align with the fixed physics step (high-refresh
+  // monitors, vsync miss, occasional double-step). Two reusable buffers hold
+  // the pose at the previous and current physics step; each render frame lerps
+  // them by the loop's `alpha` ∈ [0, 1).
+  const initialSnap = vehicle.readSnapshot();
+  const prevSnap = cloneSnapshot(initialSnap);
+  const currSnap = cloneSnapshot(initialSnap);
+  const lerpedSnap = cloneSnapshot(initialSnap);
 
   // FPS counter — exponential moving average over last frame durations.
   let fps = 60;
   let lastFrameTs = performance.now();
+  // Latest engine load for the audio synth, captured in the fixed step.
+  let lastThrottle = 0;
+  let lastBrake = 0;
 
   const loop: Loop = createLoop({
     step(dt) {
+      // The pose at the end of the previous step becomes "prev" for the next
+      // render interpolation. Then run physics, then capture the new "curr".
+      copySnapshot(currSnap, prevSnap);
+
       const ctrl = input.sample(dt);
       if (ctrl.reset) vehicle.reset();
       vehicle.update(ctrl, dt);
+      lastThrottle = ctrl.throttle;
+      lastBrake = ctrl.brake;
       physics.step();
+
+      copySnapshot(vehicle.readSnapshot(), currSnap);
     },
-    render(_alpha) {
+    render(alpha) {
       const now = performance.now();
       const elapsed = (now - lastFrameTs) / 1000;
       lastFrameTs = now;
       const instantaneous = elapsed > 0 ? 1 / elapsed : fps;
       fps = fps * 0.92 + instantaneous * 0.08;
 
-      const snap = vehicle.readSnapshot();
-      vehicleVisual.applySnapshot(snap);
+      // Interpolate pose between the previous and current physics step. With
+      // steps==1 per rAF (60 Hz monitor), alpha is near 0 and lerpedSnap ≈
+      // prevSnap (one step lag, ~16 ms — invisible). On a 144 Hz monitor where
+      // most frames have steps==0, alpha grows smoothly from 0 → 1, so the car
+      // and camera move every frame instead of ticking at 60 Hz.
+      lerpSnapshot(prevSnap, currSnap, alpha, lerpedSnap, prevQuat, currQuat);
+      vehicleVisual.applySnapshot(lerpedSnap);
 
-      camTargetPos.set(snap.position.x, snap.position.y, snap.position.z);
-      camTargetQuat.set(snap.rotation.x, snap.rotation.y, snap.rotation.z, snap.rotation.w);
+      // Tire-ground FX. Feed the lerped wheel snapshots directly — they
+      // already carry the per-tick slip + world contact point. The chassis
+      // rotation feeds the band-width direction so skid stamps stay aligned
+      // with the body axis through drifts (instead of zig-zagging on noisy
+      // motion-vector deltas). Camera position is used to cull smoke spawns
+      // at long range.
+      tireFx.update(lerpedSnap.wheels, elapsed, rig.camera.position, lerpedSnap.rotation);
+
+      // Sync the dynamic crates to whatever Rapier produced this step. The
+      // speed bump is static so its entries no-op, but the read is cheap.
+      obstacleVisuals.update(obstacles.readSnapshot());
+
+      camTargetPos.set(lerpedSnap.position.x, lerpedSnap.position.y, lerpedSnap.position.z);
+      camTargetQuat.set(
+        lerpedSnap.rotation.x,
+        lerpedSnap.rotation.y,
+        lerpedSnap.rotation.z,
+        lerpedSnap.rotation.w,
+      );
       rig.follow(camTargetPos, camTargetQuat, elapsed, cameraInput.sample(elapsed));
+
+      // Advance weather and feed wetness → tire grip. Sky/rain are GPU-driven,
+      // so this is just uniform updates + one grip setter — cheap on mobile.
+      weather.update(elapsed, rig.camera.position);
+      vehicle.setGripMultiplier(wetnessToGrip(weather.wetness));
+
+      // Refresh the debug overlay before rendering (it lives in the scene).
+      // `debugRender()` is only walked when the overlay is on.
+      if (debug.enabled) debug.update(physics.world.debugRender(), vehicle.readDebugFrame());
 
       renderer.render(sceneBundle.scene, rig.camera);
 
-      if (onStats) onStats({ speedMs: Math.abs(snap.speed), fps });
+      // Engine note: load from throttle, or the brake when crawling (reverse rev).
+      const spd = Math.abs(lerpedSnap.speed);
+      engineAudio.update(spd, lastThrottle > 0 ? lastThrottle : spd < 1 ? lastBrake : 0);
+
+      if (onStats) onStats({ speedMs: spd, fps });
     },
   });
   loop.start();
 
   return {
     bus,
+    setSkeleton,
     dispose() {
       loop.stop();
       resizeObserver.disconnect();
       window.removeEventListener('keydown', onWeatherKey);
       window.removeEventListener('keydown', onCameraKey);
+      window.removeEventListener('keydown', onDebugKey);
+      debug.dispose();
+      weather.dispose();
+      window.removeEventListener('pointerdown', resumeAudio);
+      window.removeEventListener('keydown', resumeAudio);
+      engineAudio.dispose();
       input.dispose();
       cameraInput.dispose();
+      tireFx.dispose();
       vehicleVisual.dispose();
+      obstacleVisuals.dispose();
+      obstacles.dispose();
       ground.dispose();
       disposeSurfaceMaterials(materials);
+      sceneBundle.scene.environment = null;
+      environment.dispose();
       sceneBundle.dispose();
       renderer.dispose();
       vehicle.dispose();
@@ -223,4 +392,103 @@ function pickSpawn(zone: ZoneManifest): { position: [number, number, number]; ro
   const first = zone.spawnPoints[0];
   if (!first) throw new Error(`zone ${zone.id} has no spawn points`);
   return { position: first.position, rotation: first.rotation };
+}
+
+// ── Snapshot interpolation helpers ───────────────────────────────────────────
+// Cars use a reused-buffer snapshot (no allocation per readSnapshot call), so
+// we keep our own buffers to hold "pose at last step" vs "pose at current
+// step" and interpolate by the loop's `alpha`. Visuals + camera then move
+// smoothly each rendered frame regardless of monitor refresh vs physics rate.
+
+/** Clone a snapshot's shape (deep copy of nested objects). Run once at init. */
+function cloneSnapshot(src: VehicleSnapshot): VehicleSnapshot {
+  return {
+    position: { x: src.position.x, y: src.position.y, z: src.position.z },
+    rotation: { x: src.rotation.x, y: src.rotation.y, z: src.rotation.z, w: src.rotation.w },
+    speed: src.speed,
+    wheels: src.wheels.map((w) => ({
+      position: { x: w.position.x, y: w.position.y, z: w.position.z },
+      steering: w.steering,
+      rotation: w.rotation,
+      inContact: w.inContact,
+      contact: { x: w.contact.x, y: w.contact.y, z: w.contact.z },
+      slip: w.slip,
+    })),
+  };
+}
+
+/** Copy `src` into `dst` in place — no allocations. */
+function copySnapshot(src: VehicleSnapshot, dst: VehicleSnapshot): void {
+  dst.position.x = src.position.x;
+  dst.position.y = src.position.y;
+  dst.position.z = src.position.z;
+  dst.rotation.x = src.rotation.x;
+  dst.rotation.y = src.rotation.y;
+  dst.rotation.z = src.rotation.z;
+  dst.rotation.w = src.rotation.w;
+  dst.speed = src.speed;
+  for (let i = 0; i < src.wheels.length; i++) {
+    const sw = src.wheels[i];
+    const dw = dst.wheels[i];
+    if (!sw || !dw) continue;
+    dw.position.x = sw.position.x;
+    dw.position.y = sw.position.y;
+    dw.position.z = sw.position.z;
+    dw.steering = sw.steering;
+    dw.rotation = sw.rotation;
+    dw.inContact = sw.inContact;
+    dw.contact.x = sw.contact.x;
+    dw.contact.y = sw.contact.y;
+    dw.contact.z = sw.contact.z;
+    dw.slip = sw.slip;
+  }
+}
+
+/**
+ * Linearly interpolate `a` → `b` by `t ∈ [0, 1]`, writing into `out`.
+ * Rotation is slerped (not lerped) so quaternion direction stays unit-length.
+ * `qScratchA` / `qScratchB` are temp THREE quaternions to avoid per-frame
+ * allocation in `Quaternion.slerpQuaternions`.
+ */
+function lerpSnapshot(
+  a: VehicleSnapshot,
+  b: VehicleSnapshot,
+  t: number,
+  out: VehicleSnapshot,
+  qScratchA: THREE.Quaternion,
+  qScratchB: THREE.Quaternion,
+): void {
+  out.position.x = a.position.x + (b.position.x - a.position.x) * t;
+  out.position.y = a.position.y + (b.position.y - a.position.y) * t;
+  out.position.z = a.position.z + (b.position.z - a.position.z) * t;
+
+  qScratchA.set(a.rotation.x, a.rotation.y, a.rotation.z, a.rotation.w);
+  qScratchB.set(b.rotation.x, b.rotation.y, b.rotation.z, b.rotation.w);
+  qScratchA.slerp(qScratchB, t);
+  out.rotation.x = qScratchA.x;
+  out.rotation.y = qScratchA.y;
+  out.rotation.z = qScratchA.z;
+  out.rotation.w = qScratchA.w;
+
+  out.speed = a.speed + (b.speed - a.speed) * t;
+
+  for (let i = 0; i < a.wheels.length; i++) {
+    const aw = a.wheels[i];
+    const bw = b.wheels[i];
+    const ow = out.wheels[i];
+    if (!aw || !bw || !ow) continue;
+    ow.position.x = aw.position.x + (bw.position.x - aw.position.x) * t;
+    ow.position.y = aw.position.y + (bw.position.y - aw.position.y) * t;
+    ow.position.z = aw.position.z + (bw.position.z - aw.position.z) * t;
+    ow.steering = aw.steering + (bw.steering - aw.steering) * t;
+    ow.rotation = aw.rotation + (bw.rotation - aw.rotation) * t;
+    // Contact is discrete — snap to the latest step rather than fading.
+    ow.inContact = bw.inContact;
+    // Lerp the contact point and slip magnitude the same way as position so
+    // skid marks land smoothly between physics ticks on high-refresh monitors.
+    ow.contact.x = aw.contact.x + (bw.contact.x - aw.contact.x) * t;
+    ow.contact.y = aw.contact.y + (bw.contact.y - aw.contact.y) * t;
+    ow.contact.z = aw.contact.z + (bw.contact.z - aw.contact.z) * t;
+    ow.slip = aw.slip + (bw.slip - aw.slip) * t;
+  }
 }
