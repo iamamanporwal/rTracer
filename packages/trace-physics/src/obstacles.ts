@@ -50,9 +50,13 @@ export function createObstacleField(world: RAPIER.World): ObstacleField {
     }),
   );
 
-  // Crates — dynamic 1 m cubes. A row of three, a stack of two behind, and a
-  // lone one off to the side close enough to clip on the way out of the spawn.
-  const cratePositions: Array<{ x: number; y: number; z: number }> = [
+  // Steel crates — dynamic 1 m cubes with real heft (≈600 kg each, a hollow
+  // welded-plate box rather than a featherweight prop). The mass matters: a
+  // heavy box resists the chassis on contact, so the collision force spikes high
+  // enough to crumple the car body (the renderer's deformation pass reads that
+  // force). A row of three, a stack of two behind, and a lone one off to the
+  // side close enough to clip on the way out of the spawn.
+  const cratePositions: { x: number; y: number; z: number }[] = [
     { x: -1.5, y: 0.5, z: -18 },
     { x: 0, y: 0.5, z: -18 },
     { x: 1.5, y: 0.5, z: -18 },
@@ -69,8 +73,8 @@ export function createObstacleField(world: RAPIER.World): ObstacleField {
         kind: 'crate',
         position: p,
         halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
-        mass: 12,
-        friction: 0.6,
+        mass: 600,
+        friction: 0.85,
       }),
     );
   }
@@ -79,9 +83,7 @@ export function createObstacleField(world: RAPIER.World): ObstacleField {
 
   return {
     readSnapshot() {
-      for (let i = 0; i < entries.length; i++) {
-        const e = entries[i];
-        if (!e) continue;
+      for (const e of entries) {
         const t = e.body.translation();
         const r = e.body.rotation();
         e.snapshot.position.x = t.x;

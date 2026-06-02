@@ -1,5 +1,6 @@
 import { createRootRoute, createRoute, createRouter, Outlet, Link } from '@tanstack/react-router';
 import { Garage } from './game/garage';
+import { MapSelect } from './game/map-select';
 import { HubLanding } from './hub/hub-landing';
 import { ZoneSelect } from './hub/zone-select';
 import { VehicleSelect } from './hub/vehicle-select';
@@ -27,6 +28,12 @@ const garageRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: Garage,
+});
+
+const mapSelectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/maps',
+  component: MapSelect,
 });
 
 const playRoute = createRoute({
@@ -118,6 +125,7 @@ const passportRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   garageRoute,
+  mapSelectRoute,
   playRoute,
   devLayoutRoute.addChildren([
     devHomeRoute,

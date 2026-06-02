@@ -104,8 +104,17 @@ function GarageStage({ cars }: { cars: Loaded[] }) {
     <Shell>
       {/* Top bar */}
       <header className="relative z-10 flex items-center justify-between px-6 pt-6 sm:px-10">
-        <div className="font-mono text-[11px] uppercase tracking-[0.4em] text-mw-muted">
-          TRACE <span className="text-mw-accent">{'// Garage'}</span>
+        <div className="flex items-center gap-5">
+          <div className="font-mono text-[11px] uppercase tracking-[0.4em] text-mw-muted">
+            TRACE <span className="text-mw-accent">{'// Garage'}</span>
+          </div>
+          <nav className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.3em]">
+            <span className="text-mw-text">Cars</span>
+            <span className="text-mw-edge">·</span>
+            <Link to="/maps" className="text-mw-muted transition-colors hover:text-mw-accent">
+              Tracks
+            </Link>
+          </nav>
         </div>
         <div className="font-display text-sm tracking-[0.3em] text-mw-muted">
           <span className="text-mw-text">{String(i + 1).padStart(2, '0')}</span> /{' '}
@@ -148,16 +157,25 @@ function GarageStage({ cars }: { cars: Loaded[] }) {
                 {spec.drivetrain} · {spec.powerHp} HP · {spec.gearLabel} · {spec.redline} RPM
               </div>
 
-              <button
-                type="button"
-                onClick={drive}
-                className="group mt-7 inline-flex -skew-x-12 items-center gap-3 bg-mw-accent px-9 py-3.5 shadow-[0_0_34px_rgba(54,166,255,0.45)] transition-colors hover:bg-white"
-              >
-                <span className="skew-x-12 font-display text-xl font-bold uppercase tracking-[0.2em] text-mw-bg">
-                  Drive
-                </span>
-                <ChevronRight className="skew-x-12 text-mw-bg" size={22} strokeWidth={3} />
-              </button>
+              <div className="mt-7 flex flex-wrap items-center gap-4">
+                <button
+                  type="button"
+                  onClick={drive}
+                  className="group inline-flex -skew-x-12 items-center gap-3 bg-mw-accent px-9 py-3.5 shadow-[0_0_34px_rgba(54,166,255,0.45)] transition-colors hover:bg-white"
+                >
+                  <span className="skew-x-12 font-display text-xl font-bold uppercase tracking-[0.2em] text-mw-bg">
+                    Drive
+                  </span>
+                  <ChevronRight className="skew-x-12 text-mw-bg" size={22} strokeWidth={3} />
+                </button>
+                <Link
+                  to="/maps"
+                  className="font-mono text-[11px] uppercase leading-tight tracking-[0.25em] text-mw-muted transition-colors hover:text-mw-accent"
+                >
+                  <span className="block text-[9px] tracking-[0.3em] text-mw-muted/70">Track</span>
+                  {prettyZone(selectedZone?.id ?? DEFAULT_ZONE_ID)}
+                </Link>
+              </div>
             </div>
 
             {/* Stat panel */}
@@ -389,6 +407,11 @@ function deriveSpec(m: VehicleManifest): Spec {
       : `${m.gearbox.ratios.length}-SPD ${m.gearbox.type.toUpperCase()}`;
 
   return { powerHp, topKmh, drivetrain, classLabel, gearLabel, redline: m.engine.redline, meters };
+}
+
+/** `zone_drift` → `DRIFT`, `zone_alpha` → `ALPHA` — a compact track label. */
+function prettyZone(id: string): string {
+  return id.replace(/^zone_/, '').replace(/_/g, ' ').toUpperCase();
 }
 
 function pct(v: number): string {

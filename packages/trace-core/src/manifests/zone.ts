@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { QuatSchema, Vec3Schema } from '../math/vec';
+import { SURFACE_TAGS } from '../surface';
 
 /**
  * Zone manifest — the only thing the runtime needs to load a zone.
@@ -24,6 +25,40 @@ export const ZoneManifestSchema = z.object({
     skybox: z.string(),
   }),
 
+  /**
+   * Optional GLB world binding. When present, the renderer loads this glTF/GLB
+   * as the drivable environment (instead of the flat programmer-art ground) and
+   * the physics layer derives a static trimesh collider from the same geometry.
+   * Absent → the legacy flat ground + obstacle field is used (back-compat with
+   * `zone_alpha`, the W2 demo plane).
+   *
+   * The GLB is the single source of truth for both visual and collision: we load
+   * it once on the renderer, build the Three scene, then hand the merged
+   * world-space vertex/index buffers to Rapier for the collider. This avoids a
+   * second fetch and keeps visual and physics geometry exactly in sync.
+   */
+  world: z
+    .object({
+      format: z.literal('glb'),
+      /** GLB/glTF path relative to the zone bundle dir, e.g. `world.glb`. */
+      glb: z.string(),
+      /** Uniform scale applied to the loaded scene (model units → meters). */
+      scale: z.number().positive().optional(),
+      /** Yaw about Y (radians) applied to orient the world. */
+      yaw: z.number().optional(),
+      /** Post-fit world-space nudge (meters) for fine alignment. */
+      offset: Vec3Schema.optional(),
+      /** Surface tag driving collider friction (audio/decals later). Default `tarmac`. */
+      surface: z.enum(SURFACE_TAGS).optional(),
+      /**
+       * Material-name substrings (case-insensitive) whose meshes are excluded
+       * from the collision trimesh but still rendered — e.g. tree foliage cards.
+       * Default `['leaf']` so canopy doesn't become an invisible wall.
+       */
+      collisionExcludeMaterials: z.array(z.string()).optional(),
+    })
+    .optional(),
+
   semanticSidecar: z.string(),
 
   spawnPoints: z
@@ -41,6 +76,7 @@ export const ZoneManifestSchema = z.object({
 });
 
 export type ZoneManifest = z.infer<typeof ZoneManifestSchema>;
+export type ZoneWorldConfig = NonNullable<ZoneManifest['world']>;
 export type ZonePhysicsProfile = ZoneManifest['physicsProfile'];
 export type ZoneControlScheme = ZoneManifest['controlScheme'];
 export type ZoneFidelityTier = ZoneManifest['fidelityTier'];

@@ -1,3 +1,6 @@
 {
-  "zones": [{ "id": "zone_alpha", "version": "0.1.0" }]
+  "zones": [
+    { "id": "zone_alpha", "version": "0.1.0" },
+    { "id": "zone_drift", "version": "0.1.0" }
+  ]
 }

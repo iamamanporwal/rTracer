@@ -46,6 +46,13 @@ import { computeDriveCommand, deriveDrivetrainParams } from './drivetrain';
 const SETTLE_STEPS = 60;
 const SETTLE_DT = 1 / 60;
 
+/**
+ * Minimum summed contact force (Rapier units) on the chassis collider before a
+ * contact-force event fires. Tuned to ignore suspension settle / light curb
+ * scrapes while still catching any genuine crash into a steel crate or wall.
+ */
+const CHASSIS_CONTACT_FORCE_THRESHOLD = 800;
+
 export function createCarController(
   world: RAPIER.World,
   options: CreateVehicleOptions,
@@ -105,7 +112,13 @@ export function createCarController(
   )
     .setDensity(0)
     .setFriction(0.4)
-    .setRestitution(0.0);
+    .setRestitution(0.0)
+    // Report contact forces involving the chassis so the renderer can crumple
+    // the body mesh on a crash (BeamNG-style deformation). The threshold filters
+    // out incidental scrapes (curbs, bottoming on a speed bump) — only a real
+    // hit clears it. The deformation layer maps the reported force → dent depth.
+    .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS)
+    .setContactForceEventThreshold(CHASSIS_CONTACT_FORCE_THRESHOLD);
   world.createCollider(colliderDesc, body);
 
   const controller = world.createVehicleController(body);

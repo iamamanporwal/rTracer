@@ -1,0 +1,33 @@
+{
+  "id": "zone_drift",
+  "name": "Drift Circuit",
+  "version": "0.1.0",
+  "physicsProfile": "drift",
+  "controlScheme": "drift",
+  "fidelityTier": "high",
+  "assets": {
+    "mesh": "world.glb",
+    "collider": "world.glb",
+    "textures": "world.glb",
+    "skybox": "skybox.hdr"
+  },
+  "world": {
+    "format": "glb",
+    "glb": "world.glb",
+    "scale": 1,
+    "yaw": 0,
+    "offset": [0, 0, 0],
+    "surface": "tarmac",
+    "collisionExcludeMaterials": ["leaf"]
+  },
+  "semanticSidecar": "semantic.json",
+  "spawnPoints": [
+    {
+      "id": "grid_start",
+      "position": [108, 1.0, 52],
+      "rotation": [0, 0, 0, 1]
+    }
+  ],
+  "modesSupported": ["free_roam", "timed_run"],
+  "credits": "Drift Race Track Free by Nicholas-3D (Sketchfab, CC-BY-ND-4.0)"
+}

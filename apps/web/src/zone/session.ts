@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {
   createEventBus,
   vehicleBundleDir,
+  zoneBundleDir,
   type EventBus,
   type VehicleManifest,
   type ZoneManifest,
@@ -11,6 +12,8 @@ import {
   createObstacleField,
   createPhysicsWorld,
   createVehicle,
+  createZoneCollider,
+  raycastGroundY,
   initRapier,
   PHYSICS_PROFILES,
   type ObstacleField,
@@ -20,10 +23,12 @@ import {
 } from '@trace/physics';
 import {
   CAMERA_MODES,
+  createBodyDeformer,
   createCameraRig,
   createEngineAudio,
   createEnvironmentMap,
   createGlbVehicleVisual,
+  createGlbZoneVisual,
   createGroundVisual,
   createObstacleVisuals,
   createPhysicsDebug,
@@ -41,10 +46,12 @@ import {
   type ObstacleVisuals,
   type PhysicsDebug,
   type SceneBundle,
+  type BodyDeformer,
   type SurfaceMaterials,
   type TireFx,
   type VehicleVisual,
   type WeatherSystem,
+  type ZoneVisual,
 } from '@trace/renderer';
 import { createKeyboardInput, type InputDriver } from './input';
 import { createCameraInput, type CameraInputDriver } from './camera-input';
@@ -63,6 +70,13 @@ export type SessionStats = {
   speedMs: number;
   fps: number;
 };
+
+/** Metres above the raycast-found surface to seat a car in a GLB world — the
+ * chassis-centre height. Matches zone_alpha's flat-ground spawn (0.5): low
+ * enough that the car barely drops (no settle bounce, no tunnel-prone
+ * free-fall), high enough that the wheels' suspension rays reach the ground on
+ * the first frame. */
+const GLB_SPAWN_CLEARANCE_M = 0.5;
 
 export type SessionInit = {
   canvas: HTMLCanvasElement;
@@ -112,33 +126,68 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   const physics: PhysicsWorld = createPhysicsWorld();
   const profile = PHYSICS_PROFILES[zoneManifest.physicsProfile];
 
-  // Ground (W4 will swap this for the zone's collider asset).
-  createGround(physics.world, { tag: 'tarmac' });
-
-  // Spawn-area obstacle field — speed bump straight ahead + a few crates.
-  const obstacles: ObstacleField = createObstacleField(physics.world);
-
-  // Vehicle.
-  const spawn = pickSpawn(zoneManifest);
-  const vehicle: VehicleHandle = createVehicle(physics.world, {
-    manifest: vehicleManifest,
-    profile,
-    spawn,
-  });
-
-  // Renderer + scene + image-based lighting (so car paint/chrome reflects).
+  // Renderer + scene + image-based lighting (so car paint/chrome — and the GLB
+  // world's PBR materials — reflect). Built before the world so the GLB loader
+  // can apply the environment map to the track's materials.
   const renderer = createRenderer(canvas);
   const sceneBundle: SceneBundle = createScene();
   const environment: EnvironmentMap = createEnvironmentMap(renderer);
   sceneBundle.scene.environment = environment.texture;
   const materials: SurfaceMaterials = createSurfaceMaterials();
-  const ground: GroundVisual = createGroundVisual(materials);
-  sceneBundle.scene.add(ground.group);
 
-  // Obstacle visuals mirror the physics field. Initial snapshot positions the
-  // meshes; `obstacleVisuals.update` syncs the dynamic crates each render frame.
-  const obstacleVisuals: ObstacleVisuals = createObstacleVisuals(obstacles.readSnapshot());
-  sceneBundle.scene.add(obstacleVisuals.group);
+  // ── World ────────────────────────────────────────────────────────────────
+  // Two paths, chosen by the manifest:
+  //   • `world` declared → load a real GLB track and derive one static trimesh
+  //     collider from the same geometry (zone_drift and future zones).
+  //   • no `world`       → the W2 flat programmer-art ground + obstacle field
+  //     (zone_alpha, the demo plane). Fully back-compatible.
+  let zoneVisual: ZoneVisual | null = null;
+  let groundVisual: GroundVisual | null = null;
+  let obstacles: ObstacleField | null = null;
+  let obstacleVisuals: ObstacleVisuals | null = null;
+
+  if (zoneManifest.world) {
+    const url = `${zoneBundleDir(zoneManifest.id, zoneManifest.version)}/${zoneManifest.world.glb}`;
+    zoneVisual = await createGlbZoneVisual({
+      url,
+      config: zoneManifest.world,
+      environment: environment.texture,
+    });
+    createZoneCollider(physics.world, {
+      vertices: zoneVisual.collision.vertices,
+      indices: zoneVisual.collision.indices,
+      tag: zoneManifest.world.surface,
+    });
+    sceneBundle.scene.add(zoneVisual.group);
+  } else {
+    createGround(physics.world, { tag: 'tarmac' });
+    // Spawn-area obstacle field — speed bump straight ahead + a few crates.
+    obstacles = createObstacleField(physics.world);
+    groundVisual = createGroundVisual(materials);
+    sceneBundle.scene.add(groundVisual.group);
+    // Obstacle visuals mirror the physics field. Initial snapshot positions the
+    // meshes; `obstacleVisuals.update` syncs the dynamic crates each render frame.
+    obstacleVisuals = createObstacleVisuals(obstacles.readSnapshot());
+    sceneBundle.scene.add(obstacleVisuals.group);
+  }
+
+  // Vehicle. Spawn XZ + facing come from the manifest. For a GLB world the
+  // ground sits at an arbitrary Y (the track origin can be metres below 0), so
+  // we raycast down through the freshly-built collider and seat the car just
+  // above the real surface — dropping from a fixed height would free-fall fast
+  // enough to tunnel through the thin trimesh.
+  const spawn = pickSpawn(zoneManifest);
+  if (zoneManifest.world) {
+    const groundY = raycastGroundY(physics.world, spawn.position[0], spawn.position[2]);
+    if (groundY != null) {
+      spawn.position = [spawn.position[0], groundY + GLB_SPAWN_CLEARANCE_M, spawn.position[2]];
+    }
+  }
+  const vehicle: VehicleHandle = createVehicle(physics.world, {
+    manifest: vehicleManifest,
+    profile,
+    spawn,
+  });
 
   // Vehicle visual: a rigged GLB when the manifest declares one, else the
   // procedural demo body. Both honour the same applySnapshot contract.
@@ -155,6 +204,13 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
     vehicleVisual = createVehicleVisual({ manifest: vehicleManifest, liveryColor });
   }
   sceneBundle.scene.add(vehicleVisual.group);
+
+  // Body deformation — crumples the car's body mesh on hard contacts. Driven by
+  // contact-force impacts harvested from Rapier each step (see `physics.step` /
+  // `drainImpacts`), filtered to those involving the chassis body. Null if the
+  // visual has no deformable mesh (it never does for the shipped cars).
+  const deformer: BodyDeformer | null = createBodyDeformer({ group: vehicleVisual.group });
+  const chassisBodyHandle = vehicle.body.handle;
 
   // Tire ground-contact FX — per-wheel skid marks + shared smoke pool. Reads
   // per-wheel `slip`/`contact` from the physics snapshot each render frame,
@@ -260,7 +316,8 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(canvas);
 
-  // Scratch buffers for camera follow — alloc-free per frame.
+  // Scratch buffers for the camera target — written from the discrete physics
+  // pose each fixed step and handed to `rig.advance`. Alloc-free.
   const camTargetPos = new THREE.Vector3();
   const camTargetQuat = new THREE.Quaternion();
   // Quaternion scratch for slerp (Three's `slerpQuaternions` writes in-place).
@@ -279,7 +336,6 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
 
   // FPS counter — exponential moving average over last frame durations.
   let fps = 60;
-  let lastFrameTs = performance.now();
   // Latest engine load for the audio synth, captured in the fixed step.
   let lastThrottle = 0;
   let lastBrake = 0;
@@ -291,20 +347,43 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       copySnapshot(currSnap, prevSnap);
 
       const ctrl = input.sample(dt);
-      if (ctrl.reset) vehicle.reset();
+      if (ctrl.reset) {
+        vehicle.reset();
+        deformer?.reset();
+      }
       vehicle.update(ctrl, dt);
       lastThrottle = ctrl.throttle;
       lastBrake = ctrl.brake;
       physics.step();
 
       copySnapshot(vehicle.readSnapshot(), currSnap);
+
+      // Advance the camera spring at the same fixed step the physics runs at,
+      // chasing the authoritative (discrete) pose. The rig stores prev/curr
+      // internally; `render` interpolates them by the loop's `alpha` — the same
+      // `alpha` the car visual uses — so camera and car stay in lockstep with no
+      // second clock. `cameraInput.sample` returns the live (mouse-driven)
+      // orbit control; its dt arg is ignored by the sticky-orbit driver.
+      camTargetPos.set(currSnap.position.x, currSnap.position.y, currSnap.position.z);
+      camTargetQuat.set(
+        currSnap.rotation.x,
+        currSnap.rotation.y,
+        currSnap.rotation.z,
+        currSnap.rotation.w,
+      );
+      rig.advance(camTargetPos, camTargetQuat, dt, cameraInput.sample(dt));
     },
-    render(alpha) {
-      const now = performance.now();
-      const elapsed = (now - lastFrameTs) / 1000;
-      lastFrameTs = now;
+    render(alpha, frameDt) {
+      // Single authoritative frame clock from the loop — no second
+      // `performance.now()` read, so every subsystem advances together.
+      const elapsed = frameDt;
       const instantaneous = elapsed > 0 ? 1 / elapsed : fps;
       fps = fps * 0.92 + instantaneous * 0.08;
+
+      // Interpolated camera pose for this frame (lockstep with the car visual
+      // below). Applied first so `rig.camera.position` is current for the
+      // distance-culling reads in the tire FX and weather passes.
+      rig.present(alpha);
 
       // Interpolate pose between the previous and current physics step. With
       // steps==1 per rAF (60 Hz monitor), alpha is near 0 and lerpedSnap ≈
@@ -313,6 +392,15 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       // and camera move every frame instead of ticking at 60 Hz.
       lerpSnapshot(prevSnap, currSnap, alpha, lerpedSnap, prevQuat, currQuat);
       vehicleVisual.applySnapshot(lerpedSnap);
+
+      // Crumple the body for any chassis impacts harvested since the last frame.
+      // We always drain (even with no deformer) so the impact buffer can't grow.
+      physics.drainImpacts((impact) => {
+        if (!deformer) return;
+        if (impact.bodyA === chassisBodyHandle || impact.bodyB === chassisBodyHandle) {
+          deformer.applyImpact(impact.point, impact.magnitude);
+        }
+      });
 
       // Tire-ground FX. Feed the lerped wheel snapshots directly — they
       // already carry the per-tick slip + world contact point. The chassis
@@ -323,17 +411,9 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       tireFx.update(lerpedSnap.wheels, elapsed, rig.camera.position, lerpedSnap.rotation);
 
       // Sync the dynamic crates to whatever Rapier produced this step. The
-      // speed bump is static so its entries no-op, but the read is cheap.
-      obstacleVisuals.update(obstacles.readSnapshot());
-
-      camTargetPos.set(lerpedSnap.position.x, lerpedSnap.position.y, lerpedSnap.position.z);
-      camTargetQuat.set(
-        lerpedSnap.rotation.x,
-        lerpedSnap.rotation.y,
-        lerpedSnap.rotation.z,
-        lerpedSnap.rotation.w,
-      );
-      rig.follow(camTargetPos, camTargetQuat, elapsed, cameraInput.sample(elapsed));
+      // speed bump is static so its entries no-op, but the read is cheap. Only
+      // the legacy flat-ground zone has an obstacle field; GLB worlds skip it.
+      if (obstacles && obstacleVisuals) obstacleVisuals.update(obstacles.readSnapshot());
 
       // Advance weather and feed wetness → tire grip. Sky/rain are GPU-driven,
       // so this is just uniform updates + one grip setter — cheap on mobile.
@@ -372,10 +452,12 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       input.dispose();
       cameraInput.dispose();
       tireFx.dispose();
+      deformer?.dispose();
       vehicleVisual.dispose();
-      obstacleVisuals.dispose();
-      obstacles.dispose();
-      ground.dispose();
+      obstacleVisuals?.dispose();
+      obstacles?.dispose();
+      groundVisual?.dispose();
+      zoneVisual?.dispose();
       disposeSurfaceMaterials(materials);
       sceneBundle.scene.environment = null;
       environment.dispose();

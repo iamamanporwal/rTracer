@@ -10,6 +10,7 @@ export const TRACE_PHYSICS_VERSION = '0.0.0';
 export * from './profiles';
 export * from './world';
 export * from './ground';
+export * from './zone-collider';
 export * from './obstacles';
 export * from './input';
 export * from './movement';

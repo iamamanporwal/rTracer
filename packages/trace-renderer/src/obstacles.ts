@@ -30,10 +30,12 @@ export function createObstacleVisuals(
   group.name = 'obstacles';
 
   // Shared materials so all crates / bumps batch the same draw state.
+  // Crates are heavy steel boxes — brushed gunmetal with a strong metallic
+  // response so they read as solid weight, not cardboard.
   const crateMat = new THREE.MeshStandardMaterial({
-    color: 0xa06030,
-    roughness: 0.85,
-    metalness: 0.0,
+    color: 0x8a9099,
+    roughness: 0.38,
+    metalness: 0.9,
   });
   const bumpMat = new THREE.MeshStandardMaterial({
     color: 0xf5c116,
@@ -78,10 +80,10 @@ export function createObstacleVisuals(
       const crate = new THREE.Mesh(geom, crateMat);
       crate.castShadow = true;
       crate.receiveShadow = true;
-      // Wireframe-ish edge so crate corners pop against the tarmac.
+      // Bright machined edge so the steel box's corners catch the light.
       const edges = new THREE.LineSegments(
         new THREE.EdgesGeometry(geom),
-        new THREE.LineBasicMaterial({ color: 0x4a2410 }),
+        new THREE.LineBasicMaterial({ color: 0xc8ced6 }),
       );
       crate.add(edges);
       obj = crate;

@@ -14,6 +14,15 @@ import * as THREE from 'three';
  * Damping is a critically-damped spring approximation: a single lerp factor per
  * frame with a time-step-independent decay constant. Stable across variable
  * frame rates and never overshoots.
+ *
+ * **Fixed-step + interpolation.** The spring is integrated in {@link
+ * CameraRig.advance} at the simulation's *fixed* timestep (deterministic dt →
+ * no variable-frame-time wobble), writing into an internal prev/curr pose pair.
+ * {@link CameraRig.present} then interpolates that pair by the loop's `alpha`
+ * each rendered frame — the same `alpha` the car visual uses — so the camera
+ * and the car move in perfect lockstep at any monitor refresh rate. This is
+ * what keeps both jitter-free when the car is fast: there is no second clock and
+ * no relative drift between what the camera tracks and where the car is drawn.
  */
 export type CameraMode = 'default' | 'wide' | 'fpv';
 
@@ -55,13 +64,25 @@ export type CameraRig = {
   readonly mode: CameraMode;
   /** Switch mode (Default ⇄ Wide ⇄ FPV). The follow transition is damped. */
   setMode(mode: CameraMode): void;
-  /** Update from the latest vehicle pose. `dt` in seconds. `control` orbits/zooms. */
-  follow(
+  /**
+   * Advance the damped follow by one *fixed* simulation step. Rolls the current
+   * pose into "previous" and springs a new "current" pose toward the target.
+   * Call once per physics step (deterministic `dt`); {@link present} then
+   * interpolates between the two for the rendered frame. `control` orbits/zooms.
+   */
+  advance(
     targetPosition: THREE.Vector3,
     targetQuaternion: THREE.Quaternion,
     dt: number,
     control?: CameraControl,
   ): void;
+  /**
+   * Apply the interpolated camera pose for the rendered frame. `alpha ∈ [0, 1]`
+   * is the loop's accumulator fraction — the same value the car visual uses, so
+   * camera and car stay in lockstep. Lerps the prev→curr position and look
+   * target, then orients the camera.
+   */
+  present(alpha: number): void;
   /** Snap to the target pose without damping — call once after spawn. */
   snap(targetPosition: THREE.Vector3, targetQuaternion: THREE.Quaternion, control?: CameraControl): void;
   /** Resize the projection matrix when the canvas changes. */
@@ -119,10 +140,20 @@ export function createCameraRig(options: CameraRigOptions = {}): CameraRig {
 
   const desiredPos = new THREE.Vector3();
   const desiredLook = new THREE.Vector3();
-  const currentLook = new THREE.Vector3();
   const yawQuat = new THREE.Quaternion();
   const pitchQuat = new THREE.Quaternion();
   const tmpDir = new THREE.Vector3();
+
+  // Spring state at the previous and current fixed step. `advance` springs
+  // `curr` toward the target; `present` lerps prev→curr by the loop alpha and
+  // writes the result onto `camera`. Holding the look target (not just the
+  // position) as state keeps the framing damped too.
+  const prevPos = new THREE.Vector3(0, 4, -10);
+  const currPos = new THREE.Vector3(0, 4, -10);
+  const prevLook = new THREE.Vector3();
+  const currLook = new THREE.Vector3();
+  // Scratch for the per-frame interpolation in `present` (alloc-free).
+  const renderLook = new THREE.Vector3();
 
   function computeChase(
     targetPos: THREE.Vector3,
@@ -188,19 +219,36 @@ export function createCameraRig(options: CameraRigOptions = {}): CameraRig {
         camera.updateProjectionMatrix();
       }
     },
-    follow(targetPos, targetQuat, dt, control = NEUTRAL_CAMERA_CONTROL) {
+    advance(targetPos, targetQuat, dt, control = NEUTRAL_CAMERA_CONTROL) {
       const { posDamp, lookDamp } = compute(targetPos, targetQuat, control);
+      // Roll current → previous, then spring a fresh current toward the target.
+      // `present` interpolates between the two for the rendered frame.
+      prevPos.copy(currPos);
+      prevLook.copy(currLook);
+      // Time-step-independent critically-damped approach. `dt` is the fixed
+      // simulation step, so the decay is identical every call — no variable-
+      // frame-time wobble feeds into the spring.
       const posAlpha = 1 - Math.exp(-posDamp * dt);
       const lookAlpha = 1 - Math.exp(-lookDamp * dt);
-      camera.position.lerp(desiredPos, posAlpha);
-      currentLook.lerp(desiredLook, lookAlpha);
-      camera.lookAt(currentLook);
+      currPos.lerp(desiredPos, posAlpha);
+      currLook.lerp(desiredLook, lookAlpha);
+    },
+    present(alpha) {
+      const t = alpha < 0 ? 0 : alpha > 1 ? 1 : alpha;
+      camera.position.lerpVectors(prevPos, currPos, t);
+      renderLook.lerpVectors(prevLook, currLook, t);
+      camera.lookAt(renderLook);
     },
     snap(targetPos, targetQuat, control = NEUTRAL_CAMERA_CONTROL) {
       compute(targetPos, targetQuat, control);
+      // Collapse prev == curr so the first frames don't interpolate from a
+      // stale default pose (avoids a one-step glide-in on spawn).
+      prevPos.copy(desiredPos);
+      currPos.copy(desiredPos);
+      prevLook.copy(desiredLook);
+      currLook.copy(desiredLook);
       camera.position.copy(desiredPos);
-      currentLook.copy(desiredLook);
-      camera.lookAt(currentLook);
+      camera.lookAt(desiredLook);
     },
     resize(aspect) {
       camera.aspect = aspect;

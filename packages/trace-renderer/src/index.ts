@@ -12,6 +12,8 @@ export * from './ground';
 export * from './obstacles';
 export * from './vehicle-visual';
 export * from './glb-vehicle-visual';
+export * from './glb-zone-visual';
+export * from './deformation';
 export * from './engine-audio';
 export * from './camera-rig';
 export * from './scene';

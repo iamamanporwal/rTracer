@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "zoneId": "zone_drift",
+  "centerline": {
+    "nodes": [
+      [0, 0, 0],
+      [0, 0, 60],
+      [40, 0, 100]
+    ],
+    "splineType": "catmull_rom",
+    "roadWidthM": 14.0
+  },
+  "barriers": [],
+  "startFinish": {
+    "a": [-7, 0, 0],
+    "b": [7, 0, 0]
+  },
+  "checkpoints": [],
+  "spawnPoints": [
+    {
+      "id": "grid_start",
+      "position": [108, 1.0, 52],
+      "facingYawDeg": 0
+    }
+  ]
+}

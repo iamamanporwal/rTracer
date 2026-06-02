@@ -20,11 +20,20 @@ export type LoopCallbacks = {
   /**
    * Called once per rAF after `step`s.
    *
-   * `alpha` is `accumulator / FIXED_DT` ∈ [0, 1) — use it to interpolate
-   * transforms between the last and next physics step. Renderers that don't
-   * interpolate may ignore the argument.
+   * `alpha` is `accumulator / FIXED_DT`, **clamped to [0, 1]** — use it to
+   * interpolate transforms between the previous and current physics step.
+   * Clamping matters when a heavy frame saturates `MAX_SUBSTEPS`: without it the
+   * leftover accumulator pushes `alpha > 1` and consumers extrapolate *past* the
+   * latest pose, then snap back next frame (visible jitter). Renderers that
+   * don't interpolate may ignore it.
+   *
+   * `frameDt` is the wall-clock delta for this rendered frame (seconds, already
+   * clamped to `MAX_FRAME_DT`). It is the single authoritative frame clock —
+   * consumers must use it for time-based effects (smoke, weather, FPS) rather
+   * than reading `performance.now()` again, so every subsystem advances on one
+   * consistent clock.
    */
-  render(alpha: number): void;
+  render(alpha: number, frameDt: number): void;
 };
 
 export type Loop = {
@@ -65,8 +74,11 @@ export function createLoop(callbacks: LoopCallbacks): Loop {
       steps++;
     }
 
-    const alpha = accumulator / FIXED_DT;
-    callbacks.render(alpha);
+    // Clamp to [0, 1]. After the loop the accumulator is normally < FIXED_DT,
+    // but if we hit MAX_SUBSTEPS it can still hold a full step or more — capping
+    // alpha keeps interpolation strictly *between* prev and curr (no overshoot).
+    const alpha = accumulator >= FIXED_DT ? 1 : accumulator / FIXED_DT;
+    callbacks.render(alpha, dt);
 
     rafId = requestAnimationFrame(frame);
   }
