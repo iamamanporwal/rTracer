@@ -1,0 +1,66 @@
+{
+  "id": "vehicle_nissan_s15",
+  "displayName": "Nissan S15 Silvia (Garage Mak)",
+  "version": "0.1.0",
+  "visualMesh": "model.glb",
+  "proxyMesh": "model.glb",
+  "skinning": "",
+  "rig": {
+    "wheels": [
+      { "position": [0.745, 0.30, 1.265], "radius": 0.30, "isDriven": false, "isSteered": true },
+      { "position": [-0.745, 0.30, 1.265], "radius": 0.30, "isDriven": false, "isSteered": true },
+      { "position": [0.735, 0.30, -1.265], "radius": 0.30, "isDriven": true, "isSteered": false },
+      { "position": [-0.735, 0.30, -1.265], "radius": 0.30, "isDriven": true, "isSteered": false }
+    ],
+    "seat": [0.35, 0.65, 0.1]
+  },
+  "mass": 1200,
+  "inertiaTensor": [1280, 1720, 560],
+  "engine": {
+    "powerCurveHpAtRpm": [
+      [800, 80],
+      [3000, 220],
+      [5000, 380],
+      [7000, 450],
+      [8000, 400],
+      [8500, 340]
+    ],
+    "redline": 8500
+  },
+  "gearbox": {
+    "ratios": [2.36, 1.60, 1.20, 0.97, 0.76],
+    "final": 4.08,
+    "type": "manual"
+  },
+  "visual": {
+    "format": "glb",
+    "glb": "model.glb",
+    "scale": 100.0,
+    "yaw": 0,
+    "wheels": {
+      "fl": ["Calliper Front L_02"],
+      "fr": ["Calliper Front R_04"],
+      "rl": ["Calliper Rear L_05"],
+      "rr": ["Calliper Rear R_06"]
+    }
+  },
+  "tuning": {
+    "driveAccelG": 0.48,
+    "brakeDecelG": 0.95,
+    "reverseAccelG": 0.35,
+    "maxSteerDeg": 42,
+    "steerSpeedScale": 20,
+    "frontBrakeBias": 0.60,
+    "suspensionStiffnessScale": 1.05,
+    "suspensionTravelScale": 0.90,
+    "gripScale": 0.82,
+    "comHeightScale": 0.95
+  },
+  "audio": {
+    "kind": "inline",
+    "idleHz": 65,
+    "revHz": 380,
+    "gain": 0.52
+  },
+  "credits": "This work is based on \"2018 Garage Mak Nissan S15 Silvia - Reggie Mah\" (https://sketchfab.com/3d-models/2018-garage-mak-nissan-s15-silvia-reggie-mah-f40f27e8516f42b5bc78d7f7e6acbdcf) by Reggie Mah licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)"
+}

@@ -60,9 +60,7 @@ export async function createGlbVehicleVisual(
 ): Promise<VehicleVisual> {
   const { url, manifest, restHubLocalY, environment } = options;
   const cfg = manifest.visual;
-  if (!cfg?.wheels) {
-    throw new Error(`vehicle ${manifest.id}: visual.wheels mapping is required for a GLB visual`);
-  }
+  if (!cfg) throw new Error(`vehicle ${manifest.id}: createGlbVehicleVisual called without visual config`);
 
   const loader = new GLTFLoader();
   const gltf = await loader.loadAsync(url);
@@ -82,6 +80,93 @@ export async function createGlbVehicleVisual(
   fit.rotation.set(0, cfg.yaw ?? 0, 0);
   fit.position.set(0, 0, 0);
   container.updateMatrixWorld(true);
+
+  // ── Static-body mode: no wheel nodes → ride the chassis as one rigid piece. ──
+  // Used for models whose wheel geometry is fused into the body mesh (no
+  // per-corner nodes to reparent). Wheels in the visual won't spin or steer,
+  // but the car body tracks the physics chassis correctly.
+  if (!cfg.wheels) {
+    // Align the model's ground contact (bottom of filtered bbox) with the
+    // physics ground level so the car sits correctly on the road surface.
+    // We skip meshes whose any axis exceeds 10 m — these are Sketchfab camera /
+    // light helpers that have wildly-off positions and corrupt a naive bbox.
+    const MAX_MESH_SPAN = 10;
+    const carBox = new THREE.Box3();
+    const _spanVec = new THREE.Vector3();
+    container.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      const mb = new THREE.Box3().setFromObject(obj);
+      mb.getSize(_spanVec);
+      if (Math.max(_spanVec.x, _spanVec.y, _spanVec.z) > MAX_MESH_SPAN) return;
+      carBox.union(mb);
+    });
+
+    const avgRadius = manifest.rig.wheels.reduce((s, w) => s + w.radius, 0) / 4;
+    // Physics: ground sits at (restHubLocalY - wheel radius) in body-local Y.
+    const physicsGroundLocalY = restHubLocalY - avgRadius;
+    // Model: ground contact = lowest Y in filtered bbox (wheel bottom).
+    const modelGroundY = carBox.isEmpty() ? 0 : carBox.min.y;
+
+    const offset = cfg.offset ?? [0, 0, 0];
+    fit.position.set(
+      offset[0],
+      physicsGroundLocalY - modelGroundY + offset[1],
+      offset[2],
+    );
+    container.updateMatrixWorld(true);
+
+    container.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+      const mat = obj.material as THREE.Material | THREE.Material[];
+      if (Array.isArray(mat)) mat.forEach(prepMaterialStatic);
+      else prepMaterialStatic(mat);
+    });
+    function prepMaterialStatic(m: THREE.Material): void {
+      const phys = m as THREE.MeshPhysicalMaterial;
+      if (phys.isMeshPhysicalMaterial && phys.transmission > 0) {
+        phys.transmission = 0;
+        phys.transparent = false;
+        phys.opacity = 1;
+        phys.roughness = Math.min(phys.roughness, 0.2);
+        phys.metalness = Math.max(phys.metalness, 0.1);
+      }
+      m.needsUpdate = true;
+      if (environment) {
+        const std = m as THREE.MeshStandardMaterial;
+        if (std.isMeshStandardMaterial) {
+          std.envMap = environment;
+          std.envMapIntensity = 1.0;
+        }
+      }
+    }
+
+    return {
+      group: container,
+      applySnapshot(snapshot: VehicleVisualSnapshot): void {
+        container.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
+        container.quaternion.set(
+          snapshot.rotation.x,
+          snapshot.rotation.y,
+          snapshot.rotation.z,
+          snapshot.rotation.w,
+        );
+        container.updateMatrixWorld(true);
+      },
+      dispose(): void {
+        container.traverse((obj) => {
+          const mesh = obj as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          mesh.geometry.dispose();
+          const mat = mesh.material;
+          if (Array.isArray(mat)) for (const m of mat) m.dispose();
+          else mat.dispose();
+        });
+        container.removeFromParent();
+      },
+    };
+  }
 
   // Resolve the four wheel clusters (node refs) up front, before any reparent.
   const clusterNodes: Record<(typeof WHEEL_KEYS)[number], THREE.Object3D[]> = {
