@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "zoneId": "zone_highway",
+  "centerline": {
+    "nodes": [
+      [0, 0, 0],
+      [0, 0, 100],
+      [0, 0, 200],
+      [0, 0, 300],
+      [0, 0, 400]
+    ],
+    "splineType": "catmull_rom",
+    "roadWidthM": 20.0
+  },
+  "barriers": [],
+  "startFinish": {
+    "a": [-10, 0, 0],
+    "b": [10, 0, 0]
+  },
+  "checkpoints": [],
+  "spawnPoints": [
+    {
+      "id": "grid_start",
+      "position": [0, 5, 0],
+      "facingYawDeg": 0
+    }
+  ]
+}

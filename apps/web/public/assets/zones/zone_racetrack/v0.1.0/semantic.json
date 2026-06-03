@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "zoneId": "zone_racetrack",
+  "centerline": {
+    "nodes": [
+      [0, 0, 0],
+      [0, 0, 50],
+      [50, 0, 100],
+      [100, 0, 100],
+      [150, 0, 50],
+      [150, 0, 0],
+      [100, 0, -50],
+      [50, 0, -50],
+      [0, 0, 0]
+    ],
+    "splineType": "catmull_rom",
+    "roadWidthM": 14.0
+  },
+  "barriers": [],
+  "startFinish": {
+    "a": [-7, 0, 0],
+    "b": [7, 0, 0]
+  },
+  "checkpoints": [],
+  "spawnPoints": [
+    {
+      "id": "grid_start",
+      "position": [0, 5, 0],
+      "facingYawDeg": 0
+    }
+  ]
+}

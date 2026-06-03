@@ -1,0 +1,33 @@
+{
+  "id": "zone_racetrack",
+  "name": "Race Circuit",
+  "version": "0.1.0",
+  "physicsProfile": "tarmac_circuit",
+  "controlScheme": "circuit",
+  "fidelityTier": "high",
+  "assets": {
+    "mesh": "world.glb",
+    "collider": "world.glb",
+    "textures": "world.glb",
+    "skybox": "skybox.hdr"
+  },
+  "world": {
+    "format": "glb",
+    "glb": "world.glb",
+    "scale": 1,
+    "yaw": 0,
+    "offset": [0, 0, 0],
+    "surface": "tarmac",
+    "collisionExcludeMaterials": ["leaf", "foliage", "grass"]
+  },
+  "semanticSidecar": "semantic.json",
+  "spawnPoints": [
+    {
+      "id": "grid_start",
+      "position": [0, 5, 0],
+      "rotation": [0, 0, 0, 1]
+    }
+  ],
+  "modesSupported": ["free_roam", "timed_run", "race"],
+  "credits": "Race Track (race_track_23mb_glb)"
+}
