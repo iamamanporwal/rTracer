@@ -36,6 +36,7 @@
     "glb": "model/scene.gltf",
     "scale": 1.0065,
     "yaw": 0,
+    "offset": [0, 0, 0],
     "wheels": {
       "fl": ["Wheel_FL"],
       "fr": ["Wheel_FR"],

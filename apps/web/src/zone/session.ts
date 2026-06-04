@@ -69,6 +69,9 @@ import { createLoop, type Loop } from './loop';
 export type SessionStats = {
   speedMs: number;
   fps: number;
+  position: { x: number; y: number; z: number };
+  /** Yaw heading in degrees — 0° = +Z, clockwise positive. Use this to set spawn rotation. */
+  headingDeg: number;
 };
 
 /** Metres above the raycast-found surface to seat a car in a GLB world — the
@@ -178,8 +181,20 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   // enough to tunnel through the thin trimesh.
   const spawn = pickSpawn(zoneManifest);
   if (zoneManifest.world) {
-    const groundY = raycastGroundY(physics.world, spawn.position[0], spawn.position[2]);
-    if (groundY != null) {
+    let groundY = raycastGroundY(physics.world, spawn.position[0], spawn.position[2]);
+
+    // If the manifest spawn XZ misses all collision geometry (e.g. a freshly
+    // added track whose GLB origin is far from 0,0), fall back to the zone's
+    // bounding-box centre.  This guarantees the car lands on SOMETHING instead
+    // of free-falling into the void for any map where the spawn hasn't been
+    // hand-tuned yet.
+    if (groundY == null && zoneVisual != null) {
+      const centre = zoneVisual.bounds.getCenter(new THREE.Vector3());
+      groundY = raycastGroundY(physics.world, centre.x, centre.z);
+      if (groundY != null) {
+        spawn.position = [centre.x, groundY + GLB_SPAWN_CLEARANCE_M, centre.z];
+      }
+    } else if (groundY != null) {
       spawn.position = [spawn.position[0], groundY + GLB_SPAWN_CLEARANCE_M, spawn.position[2]];
     }
   }
@@ -430,7 +445,11 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       const spd = Math.abs(lerpedSnap.speed);
       engineAudio.update(spd, lastThrottle > 0 ? lastThrottle : spd < 1 ? lastBrake : 0);
 
-      if (onStats) onStats({ speedMs: spd, fps });
+      if (onStats) {
+        const q = lerpedSnap.rotation;
+        const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
+        onStats({ speedMs: spd, fps, position: lerpedSnap.position, headingDeg: (yaw * 180) / Math.PI });
+      }
     },
   });
   loop.start();

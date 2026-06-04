@@ -24,7 +24,7 @@
   "spawnPoints": [
     {
       "id": "grid_start",
-      "position": [0, 5, 0],
+      "position": [800, 0, -3100],
       "rotation": [0, 0, 0, 1]
     }
   ],

@@ -6,6 +6,7 @@ import {
   MAX_COM_Y,
   MAX_FRICTION_SLIP,
   REFERENCE_MASS,
+  SUSPENSION_DIR,
   type CarFeel,
 } from './config';
 
@@ -149,4 +150,37 @@ export function deriveCarChassis(
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
+}
+
+/**
+ * Body-local Y at which the wheel hubs rest, averaged across all wheels, given
+ * each wheel's *settled* suspension length (read from Rapier after the car has
+ * sprung down at construction).
+ *
+ * The hub sits at `connection + SUSPENSION_DIR · length` in chassis space, so
+ * its body-local Y is `connection.y + SUSPENSION_DIR.y · length`. Computing it
+ * this way — purely in chassis space — makes the result invariant to BOTH the
+ * ground elevation AND the spawn slope.
+ *
+ * The trap this avoids: deriving the seat from a world-space delta
+ * (`wheelWorldY − bodyWorldY`) looks correct on flat ground, but when the car
+ * settles on an incline the body tilts, and that world delta then folds in a
+ * `cornerZ · sin(tilt)` term — tens of centimetres on a moderate ramp — which
+ * silently mis-seats the body mesh high or low relative to the tires. Chassis
+ * space has no notion of "up in the world", so the contamination can't occur.
+ *
+ * Averaging over all wheels (rather than sampling one corner) also centres the
+ * seat between front and rear struts, which settle to slightly different
+ * lengths because the front rides stiffer.
+ */
+export function deriveRestHubLocalY(
+  wheels: ReadonlyArray<Pick<WheelGeometry, 'connection'>>,
+  suspensionLengths: ReadonlyArray<number>,
+): number {
+  if (wheels.length === 0) return 0;
+  let sum = 0;
+  for (let i = 0; i < wheels.length; i++) {
+    sum += wheels[i]!.connection.y + SUSPENSION_DIR.y * (suspensionLengths[i] ?? 0);
+  }
+  return sum / wheels.length;
 }

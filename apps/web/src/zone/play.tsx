@@ -74,7 +74,7 @@ function CanvasMount(props: {
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sessionRef = useRef<ZoneSession | null>(null);
-  const [stats, setStats] = useState<SessionStats>({ speedMs: 0, fps: 60 });
+  const [stats, setStats] = useState<SessionStats>({ speedMs: 0, fps: 60, position: { x: 0, y: 0, z: 0 }, headingDeg: 0 });
   const [weather, setWeather] = useState<string>('Clear');
   const [camera, setCamera] = useState<string>('Chase');
   const [skeleton, setSkeletonState] = useState<boolean>(false);
@@ -179,6 +179,7 @@ function Hud(props: {
   onSkeletonChange: (next: boolean) => void;
 }) {
   const kmh = props.stats.speedMs * 3.6;
+  const { x, y, z } = props.stats.position;
   return (
     <>
       <div className="absolute top-3 left-3 px-3 py-2 rounded-md bg-black/55 backdrop-blur text-xs font-mono text-trace-fg">
@@ -196,6 +197,15 @@ function Hud(props: {
         </div>
         <div className="text-trace-muted uppercase tracking-wider">km/h</div>
         <div className="text-trace-muted mt-1">{props.stats.fps.toFixed(0)} fps</div>
+        <div className="mt-2 border-t border-white/10 pt-2 text-trace-muted leading-snug">
+          <span className="text-trace-accent">X</span> {x.toFixed(1)}
+          <br />
+          <span className="text-trace-accent">Y</span> {y.toFixed(1)}
+          <br />
+          <span className="text-trace-accent">Z</span> {z.toFixed(1)}
+          <br />
+          <span className="text-trace-accent">H</span> {props.stats.headingDeg.toFixed(1)}°
+        </div>
       </div>
       {/* Invisible-Skeleton toggle — surfaces the physics debug overlay
           (colliders, suspension rays, contacts, COM, velocity) that makes the

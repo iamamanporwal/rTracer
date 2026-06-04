@@ -37,6 +37,7 @@
     "glb": "model/scene.gltf",
     "scale": 1.0,
     "yaw": 0,
+    "offset": [0, 0, 0],
     "wheels": {
       "fl": ["wheel.001_57"],
       "fr": ["rim_73", "PneuVtx_74", "Brembo_77"],

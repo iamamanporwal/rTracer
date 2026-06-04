@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { VehicleManifest } from '@trace/core';
 import { PHYSICS_PROFILES } from '../../profiles';
-import { deriveCarChassis } from './chassis';
+import { deriveCarChassis, deriveRestHubLocalY } from './chassis';
 import { resolveCarFeel } from './config';
 
 /**
@@ -93,5 +93,49 @@ describe('deriveCarChassis', () => {
     const cl = deriveCarChassis(light, profile, resolveCarFeel(light));
     const ch = deriveCarChassis(heavy, profile, resolveCarFeel(heavy));
     expect(ch.suspension.stiffness).toBeGreaterThan(cl.suspension.stiffness);
+  });
+});
+
+describe('deriveRestHubLocalY', () => {
+  // SUSPENSION_DIR points straight down (0,-1,0), so the body-local hub Y of one
+  // wheel is `connection.y − length`, and the seat is the average over wheels.
+  it('averages connection.y − settled length across the wheels', () => {
+    const wheels = [
+      { connection: { x: 0, y: 0.04, z: 1.25 } },
+      { connection: { x: 0, y: 0.04, z: -1.25 } },
+    ];
+    expect(deriveRestHubLocalY(wheels, [0.25, 0.35])).toBeCloseTo(0.04 - 0.3, 9);
+  });
+
+  // The regression guard: the seat must depend ONLY on connection.y and the
+  // suspension lengths — never on the wheels' x/z. The old world-space formula
+  // leaked a `cornerZ · sin(slope)` term, so a car settled on an incline seated
+  // its body mesh too high or too low. Holding y and lengths fixed while moving
+  // the wheels far apart in x/z must not move the seat one bit.
+  it('ignores wheel x/z position, so the seat is slope-invariant by construction', () => {
+    const lengths = [0.28, 0.28, 0.28, 0.28];
+    const centred = deriveRestHubLocalY(
+      [
+        { connection: { x: 0, y: 0.04, z: 0 } },
+        { connection: { x: 0, y: 0.04, z: 0 } },
+        { connection: { x: 0, y: 0.04, z: 0 } },
+        { connection: { x: 0, y: 0.04, z: 0 } },
+      ],
+      lengths,
+    );
+    const spread = deriveRestHubLocalY(
+      [
+        { connection: { x: 0.8, y: 0.04, z: 1.25 } },
+        { connection: { x: -0.8, y: 0.04, z: 1.25 } },
+        { connection: { x: 0.8, y: 0.04, z: -1.25 } },
+        { connection: { x: -0.8, y: 0.04, z: -1.25 } },
+      ],
+      lengths,
+    );
+    expect(spread).toBeCloseTo(centred, 9);
+  });
+
+  it('returns 0 for an empty wheel list rather than NaN', () => {
+    expect(deriveRestHubLocalY([], [])).toBe(0);
   });
 });

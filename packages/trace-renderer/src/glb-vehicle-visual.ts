@@ -199,6 +199,17 @@ export async function createGlbVehicleVisual(
   );
   container.updateMatrixWorld(true);
 
+  // Dev aid: log the calibration numbers so you can tune offset[1] in the manifest.
+  // Gap = centroid.y - restHubLocalY; a positive gap means the car sits too high.
+  // Set visual.offset = [0, -gap, 0] to correct it.
+  if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) {
+    const gap = centroid.y - restHubLocalY;
+    console.log(
+      `[${manifest.id}] centroid.y=${centroid.y.toFixed(4)}  restHubLocalY=${restHubLocalY.toFixed(4)}` +
+      `  gap=${gap.toFixed(4)}  → set offset[1]=${(-gap).toFixed(4)} to flush wheels to ground`,
+    );
+  }
+
   // ── Reparent each cluster onto a pivot at its (now shifted) bbox center. ────
   const pivots: Record<(typeof WHEEL_KEYS)[number], WheelPivot> = {} as never;
   for (const k of WHEEL_KEYS) {

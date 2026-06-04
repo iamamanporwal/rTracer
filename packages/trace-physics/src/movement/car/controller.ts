@@ -28,7 +28,7 @@ import {
   SUSPENSION_DIR,
   UP_AXIS,
 } from './config';
-import { deriveCarChassis } from './chassis';
+import { deriveCarChassis, deriveRestHubLocalY } from './chassis';
 import { computeDriveCommand, deriveDrivetrainParams } from './drivetrain';
 
 /**
@@ -42,9 +42,15 @@ import { computeDriveCommand, deriveDrivetrainParams } from './drivetrain';
  * controller, and other movement kinds can follow the same split.
  */
 
-/** Fixed steps the car is pre-settled on its springs at construction. */
-const SETTLE_STEPS = 60;
 const SETTLE_DT = 1 / 60;
+/** Maximum steps before the settle loop gives up waiting for stability. */
+const SETTLE_MAX_STEPS = 500;
+/** Minimum steps before stability is checked (let the car start moving first). */
+const SETTLE_MIN_STEPS = 30;
+/** Consecutive stable steps required to declare the car settled. */
+const SETTLE_STABLE_COUNT = 10;
+/** Body velocity (m/s) below which the car is considered stable. */
+const SETTLE_VEL_THRESHOLD = 0.05;
 
 /**
  * Minimum summed contact force (Rapier units) on the chassis collider before a
@@ -557,14 +563,43 @@ export function createCarController(
   // grounded (no first-frame drop), and we can measure the TRUE resting body
   // height so the visual's hub seat (restHubLocalY) matches where the wheels
   // actually rest — including spring sag, which a static formula can't predict.
-  for (let i = 0; i < SETTLE_STEPS; i++) {
-    update(NEUTRAL_INPUT, SETTLE_DT);
-    world.step();
+  //
+  // Adaptive: keep stepping until the body velocity is near-zero (car at rest)
+  // or until SETTLE_MAX_STEPS. This handles the common case (~60 steps when the
+  // car spawns just above the road) AND the pathological case where a spawn-
+  // raycast hits a barrier 10-20 m above the road — previously the fixed 60
+  // steps ended mid-fall, giving a wrong restHubLocalY that made the body mesh
+  // appear sunken or floating on specific maps.
+  {
+    let stableCount = 0;
+    for (let i = 0; i < SETTLE_MAX_STEPS; i++) {
+      update(NEUTRAL_INPUT, SETTLE_DT);
+      world.step();
+      if (i >= SETTLE_MIN_STEPS) {
+        const v = body.linvel();
+        if (
+          Math.abs(v.y) < SETTLE_VEL_THRESHOLD &&
+          Math.abs(v.x) < SETTLE_VEL_THRESHOLD &&
+          Math.abs(v.z) < SETTLE_VEL_THRESHOLD
+        ) {
+          if (++stableCount >= SETTLE_STABLE_COUNT) break;
+        } else {
+          stableCount = 0;
+        }
+      }
+    }
   }
-  readSnapshot();
-
-  // Body-local Y the hub rests at, measured from the settled pose.
-  const restHubLocalY = (chassis.wheels[0]?.radius ?? 0.34) - body.translation().y;
+  // Body-local Y the hub rests at, used by the visual to seat the body mesh on
+  // its wheels. Measured from the SETTLED suspension lengths (so it captures
+  // real spring sag) but in CHASSIS space, so it is invariant to ground
+  // elevation AND spawn slope. Deriving it from world coordinates instead
+  // (`wheelWorldY − bodyWorldY`) folded the spawn tilt into the seat and made
+  // the body float or sink relative to the tires on inclines — see
+  // deriveRestHubLocalY for the full reasoning.
+  const settledLengths = chassis.wheels.map(
+    (_, i) => controller.wheelSuspensionLength(i) ?? chassis.suspension.restLength,
+  );
+  const restHubLocalY = deriveRestHubLocalY(chassis.wheels, settledLengths);
 
   return {
     kind: 'car',
