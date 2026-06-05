@@ -87,22 +87,42 @@ function makeGradientBackground(top: THREE.Color, horizon: THREE.Color): THREE.C
   return mid;
 }
 
+export type RendererOptions = {
+  /**
+   * Upper bound on the device-pixel-ratio. Defaults to `2` (desktop / retina).
+   * Mobile GPUs choke filling a 3× framebuffer, so the web app passes ~1.5 on
+   * phones — the single biggest fill-rate win without touching the look.
+   */
+  maxPixelRatio?: number;
+  /**
+   * Trade shadow softness for speed on weak GPUs. When set, antialiasing is
+   * dropped (the pixel-ratio cap already softens edges) and shadows use the
+   * cheaper non-PCF filter. Defaults to `false` — desktop is unchanged.
+   */
+  lowPower?: boolean;
+};
+
 /**
  * Renderer factory. WebGL2 per §3.1. Returns a configured `WebGLRenderer`
- * already bound to the supplied canvas.
+ * already bound to the supplied canvas. With no options the behaviour is
+ * identical to before (DPR ≤ 2, MSAA on, soft shadows).
  */
-export function createRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
+export function createRenderer(
+  canvas: HTMLCanvasElement,
+  options: RendererOptions = {},
+): THREE.WebGLRenderer {
+  const { maxPixelRatio = 2, lowPower = false } = options;
   const renderer = new THREE.WebGLRenderer({
     canvas,
-    antialias: true,
+    antialias: !lowPower,
     powerPreference: 'high-performance',
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = lowPower ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
   return renderer;
 }
 

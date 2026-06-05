@@ -53,7 +53,7 @@ import {
   type WeatherSystem,
   type ZoneVisual,
 } from '@trace/renderer';
-import { createKeyboardInput, type InputDriver } from './input';
+import { createKeyboardInput, type InputDriver, type TouchControls } from './input';
 import { createCameraInput, type CameraInputDriver } from './camera-input';
 import { createLoop, type Loop } from './loop';
 
@@ -98,6 +98,12 @@ export type SessionInit = {
    * Lets the HUD keep its checkbox in sync with the runtime.
    */
   onSkeleton?: (enabled: boolean) => void;
+  /**
+   * Mobile / low-power profile. Caps the device-pixel-ratio and drops to cheaper
+   * shadow filtering + no MSAA, the largest fill-rate wins on phone GPUs. The
+   * desktop default (`false`) is pixel-for-pixel unchanged.
+   */
+  mobile?: boolean;
 };
 
 export type ZoneSession = {
@@ -108,6 +114,24 @@ export type ZoneSession = {
    * SessionInit.onSkeleton} so any external UI stays in sync.
    */
   setSkeleton(enabled: boolean): void;
+  /**
+   * On-screen touch control surface — the mobile HUD buttons drive the car
+   * through this (throttle / brake / steer / handbrake / reset). No-op on the
+   * physics side until the next fixed step samples it.
+   */
+  readonly touch: TouchControls;
+  /** Freeze the simulation + render loop and silence the engine (pause menu). */
+  pause(): void;
+  /** Resume from {@link pause}. Safe to call when already running. */
+  resume(): void;
+  /** Whether the loop is currently paused. */
+  readonly paused: boolean;
+  /** Teleport the car back to its spawn and clear any body deformation. */
+  resetVehicle(): void;
+  /** Advance to the next camera mode (Chase → Wide → FPV). Mirrors the C key. */
+  cycleCamera(): void;
+  /** Advance to the next weather preset. Mirrors the Y key. */
+  cycleWeather(): void;
   dispose(): void;
 };
 
@@ -121,6 +145,7 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
     onWeather,
     onCameraMode,
     onSkeleton,
+    mobile = false,
   } = init;
 
   await initRapier();
@@ -132,7 +157,7 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   // Renderer + scene + image-based lighting (so car paint/chrome — and the GLB
   // world's PBR materials — reflect). Built before the world so the GLB loader
   // can apply the environment map to the track's materials.
-  const renderer = createRenderer(canvas);
+  const renderer = createRenderer(canvas, mobile ? { maxPixelRatio: 1.5, lowPower: true } : {});
   const sceneBundle: SceneBundle = createScene();
   const environment: EnvironmentMap = createEnvironmentMap(renderer);
   sceneBundle.scene.environment = environment.texture;
@@ -454,9 +479,37 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   });
   loop.start();
 
+  let paused = false;
+  const pause = (): void => {
+    if (paused) return;
+    paused = true;
+    input.touch.releaseAll(); // don't carry a held pedal across the pause
+    loop.stop();
+    engineAudio.suspend();
+  };
+  const resume = (): void => {
+    if (!paused) return;
+    paused = false;
+    engineAudio.resume();
+    loop.start();
+  };
+  const resetVehicle = (): void => {
+    vehicle.reset();
+    deformer?.reset();
+  };
+
   return {
     bus,
     setSkeleton,
+    touch: input.touch,
+    pause,
+    resume,
+    get paused() {
+      return paused;
+    },
+    resetVehicle,
+    cycleCamera: () => setCameraMode(cameraModeIndex + 1),
+    cycleWeather: () => setWeather(weatherIndex + 1),
     dispose() {
       loop.stop();
       resizeObserver.disconnect();

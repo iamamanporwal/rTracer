@@ -256,7 +256,7 @@ function MapStage({ tracks }: { tracks: Loaded[] }) {
 /** Full-screen MW backdrop — identical to the Garage shell. */
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative flex h-screen w-full flex-col overflow-hidden bg-mw-bg font-display text-mw-text">
+    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-mw-bg font-display text-mw-text">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(54,166,255,0.16),transparent_60%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background:repeating-linear-gradient(115deg,transparent_0,transparent_38px,#36a6ff_38px,#36a6ff_40px)]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(0,0,0,0.85))]" />

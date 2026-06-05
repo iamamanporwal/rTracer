@@ -9,6 +9,13 @@
     />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#0a0a0b" />
+    <!-- Standalone / home-screen behaviour so the game runs chrome-free on
+         mobile. iPhone Safari ignores the Fullscreen API, so these + the
+         address-bar-hiding viewport are how we approach fullscreen there. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Trace" />
     <meta name="description" content="Trace — browser-native motorsport sandbox." />
     <title>Trace</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -33,6 +40,24 @@
           sans-serif;
         overscroll-behavior: none;
         touch-action: none;
+      }
+      /* Lock the page on touch devices: no rubber-band scroll that reveals
+         browser chrome, no double-tap zoom, no blue tap-flash on the touch
+         controls, no long-press callout. Scoped to coarse pointers so the
+         scrollable desktop dev hub is left completely alone. */
+      @media (pointer: coarse) {
+        html,
+        body {
+          overflow: hidden;
+          -webkit-tap-highlight-color: transparent;
+          -webkit-touch-callout: none;
+        }
+        body {
+          position: fixed;
+          inset: 0;
+          -webkit-user-select: none;
+          user-select: none;
+        }
       }
     </style>
   </head>

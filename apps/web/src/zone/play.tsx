@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import type { VehicleManifest, ZoneManifest } from '@trace/core';
 import { useStore } from '~/store';
 import { loadVehicleManifest, loadZoneManifest, useAsync } from '~/manifests';
+import { useIsTouch } from '~/lib/use-device';
 import { startZoneSession, type SessionStats, type ZoneSession } from './session';
+import { TouchControls } from './touch-controls';
+import { PauseMenu } from './pause-menu';
 
 /**
  * `/play/$zoneId` route — mounts the Three.js canvas and starts a zone session.
@@ -72,8 +75,12 @@ function CanvasMount(props: {
   vehicle: VehicleManifest;
   liveryColor: `#${string}`;
 }) {
+  const isTouch = useIsTouch();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sessionRef = useRef<ZoneSession | null>(null);
+  // Mirror the session into state so the touch pad / pause menu re-render once
+  // it's live (refs alone don't trigger a render).
+  const [session, setSession] = useState<ZoneSession | null>(null);
   const [stats, setStats] = useState<SessionStats>({ speedMs: 0, fps: 60, position: { x: 0, y: 0, z: 0 }, headingDeg: 0 });
   const [weather, setWeather] = useState<string>('Clear');
   const [camera, setCamera] = useState<string>('Chase');
@@ -93,6 +100,7 @@ function CanvasMount(props: {
       zoneManifest: props.zone,
       vehicleManifest: props.vehicle,
       liveryColor: props.liveryColor,
+      mobile: isTouch,
       onStats: (s) => setStats(s),
       onWeather: (w) => setWeather(w),
       onCameraMode: (m) => setCamera(m),
@@ -104,6 +112,7 @@ function CanvasMount(props: {
           return;
         }
         sessionRef.current = s;
+        setSession(s);
         setLoading(false);
       })
       .catch((e: unknown) => {
@@ -114,8 +123,9 @@ function CanvasMount(props: {
       cancelled = true;
       sessionRef.current?.dispose();
       sessionRef.current = null;
+      setSession(null);
     };
-  }, [props.zone, props.vehicle, props.liveryColor]);
+  }, [props.zone, props.vehicle, props.liveryColor, isTouch]);
 
   const toggleSkeleton = (next: boolean): void => {
     // setSkeleton goes through the session, which fires onSkeleton → React
@@ -164,7 +174,20 @@ function CanvasMount(props: {
         camera={camera}
         skeleton={skeleton}
         onSkeletonChange={toggleSkeleton}
+        isTouch={isTouch}
       />
+      {isTouch && !loading && (
+        <>
+          <TouchControls session={session} />
+          <PauseMenu
+            session={session}
+            cameraLabel={camera}
+            weatherLabel={weather}
+            zoneName={props.zone.name}
+            vehicleName={props.vehicle.displayName}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -177,9 +200,32 @@ function Hud(props: {
   camera: string;
   skeleton: boolean;
   onSkeletonChange: (next: boolean) => void;
+  isTouch: boolean;
 }) {
   const kmh = props.stats.speedMs * 3.6;
   const { x, y, z } = props.stats.position;
+
+  // On touch the top-left is the pause chip and the bottom corners are the
+  // driving pad, so the HUD collapses to a compact speed readout that hugs the
+  // safe area. Camera / weather / FPS / position live in the pause menu and
+  // debug overlay instead — they'd only clutter a phone screen.
+  if (props.isTouch) {
+    return (
+      <div
+        className="absolute z-30 rounded-md bg-black/45 px-3 py-1.5 text-right font-mono backdrop-blur"
+        style={{
+          top: 'max(env(safe-area-inset-top), 0.75rem)',
+          right: 'max(env(safe-area-inset-right), 0.75rem)',
+        }}
+      >
+        <span data-testid="hud-speed-kmh" className="text-2xl leading-none text-trace-fg">
+          {kmh.toFixed(0)}
+        </span>
+        <span className="ml-1 text-[10px] uppercase tracking-wider text-trace-muted">km/h</span>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="absolute top-3 left-3 px-3 py-2 rounded-md bg-black/55 backdrop-blur text-xs font-mono text-trace-fg">

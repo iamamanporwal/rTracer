@@ -1,11 +1,14 @@
 import { RouterProvider } from '@tanstack/react-router';
 import { Sentry } from './sentry';
 import { router } from './router';
+import { MobileShell } from './lib/mobile-shell';
 
 export function App() {
   return (
     <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
-      <RouterProvider router={router} />
+      <MobileShell>
+        <RouterProvider router={router} />
+      </MobileShell>
     </Sentry.ErrorBoundary>
   );
 }

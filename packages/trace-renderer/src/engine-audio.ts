@@ -23,12 +23,15 @@ export type EngineAudio = {
   update(speedMs: number, throttle: number): void;
   /** Resume the audio context (call from a click/keydown). Safe to call often. */
   resume(): void;
+  /** Suspend the context — silences the engine while the game is paused. */
+  suspend(): void;
   dispose(): void;
 };
 
 const NOOP: EngineAudio = {
   update: () => undefined,
   resume: () => undefined,
+  suspend: () => undefined,
   dispose: () => undefined,
 };
 const IDLE_RPM = 800;
@@ -165,6 +168,10 @@ export function createEngineAudio(manifest: VehicleManifest): EngineAudio {
     }
   }
 
+  function suspend(): void {
+    if (ctx.state === 'running') void ctx.suspend();
+  }
+
   function dispose(): void {
     try {
       oscA.stop();
@@ -176,7 +183,7 @@ export function createEngineAudio(manifest: VehicleManifest): EngineAudio {
     void ctx.close();
   }
 
-  return { update, resume, dispose };
+  return { update, resume, suspend, dispose };
 }
 
 function clamp01(v: number): number {
