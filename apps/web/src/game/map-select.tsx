@@ -12,6 +12,7 @@ import {
 import type { ZoneManifest } from '@trace/core';
 import { useStore } from '~/store';
 import { loadZoneIndex, loadZoneManifest, useAsync } from '~/manifests';
+import { useIsTouch } from '~/lib/use-device';
 import type { ManifestRef } from '~/store';
 
 /**
@@ -69,6 +70,10 @@ function MapStage({ tracks }: { tracks: Loaded[] }) {
   const selectZone = useStore((s) => s.zone.selectZone);
   const selectedZone = useStore((s) => s.zone.selectedZone);
   const selectedVehicle = useStore((s) => s.vehicle.selectedVehicle);
+  // Touch screens are short and wide (locked landscape); the full stat panel
+  // overflows and hides the CTAs there, so on touch we keep just the track name
+  // and the action buttons — mirroring the Garage.
+  const isTouch = useIsTouch();
 
   // Open on the currently-selected track if there is one.
   const initial = Math.max(
@@ -151,23 +156,33 @@ function MapStage({ tracks }: { tracks: Loaded[] }) {
             className="mw-rise mx-auto grid w-full max-w-6xl items-end gap-8 lg:grid-cols-[1fr_auto]"
           >
             <div>
-              <div className="flex items-center gap-3 font-display text-sm uppercase tracking-[0.35em] text-mw-accent">
-                <span className="h-2 w-2 -skew-x-12 bg-mw-accent" />
-                {spec.profileLabel}
-                {isSelected && (
-                  <span className="inline-flex items-center gap-1 text-mw-text">
-                    <Check size={14} strokeWidth={3} /> Selected
-                  </span>
-                )}
-              </div>
-              <h1 className="mt-2 font-display text-5xl font-bold uppercase leading-[0.9] tracking-tight text-mw-text sm:text-6xl lg:text-7xl xl:text-8xl">
+              {!isTouch && (
+                <div className="flex items-center gap-3 font-display text-sm uppercase tracking-[0.35em] text-mw-accent">
+                  <span className="h-2 w-2 -skew-x-12 bg-mw-accent" />
+                  {spec.profileLabel}
+                  {isSelected && (
+                    <span className="inline-flex items-center gap-1 text-mw-text">
+                      <Check size={14} strokeWidth={3} /> Selected
+                    </span>
+                  )}
+                </div>
+              )}
+              <h1
+                className={
+                  isTouch
+                    ? 'font-display text-3xl font-bold uppercase leading-[0.95] tracking-tight text-mw-text sm:text-4xl'
+                    : 'mt-2 font-display text-5xl font-bold uppercase leading-[0.9] tracking-tight text-mw-text sm:text-6xl lg:text-7xl xl:text-8xl'
+                }
+              >
                 {current.manifest.name}
               </h1>
-              <div className="mt-3 font-mono text-xs uppercase tracking-[0.25em] text-mw-muted">
-                {spec.controlLabel} · {spec.fidelityLabel} · {spec.modeLabel}
-              </div>
+              {!isTouch && (
+                <div className="mt-3 font-mono text-xs uppercase tracking-[0.25em] text-mw-muted">
+                  {spec.controlLabel} · {spec.fidelityLabel} · {spec.modeLabel}
+                </div>
+              )}
 
-              <div className="mt-7 flex flex-wrap items-center gap-3">
+              <div className={(isTouch ? 'mt-4' : 'mt-7') + ' flex flex-wrap items-center gap-3'}>
                 <button
                   type="button"
                   onClick={select}
@@ -190,19 +205,22 @@ function MapStage({ tracks }: { tracks: Loaded[] }) {
               </div>
             </div>
 
-            {/* Stat panel */}
-            <div className="w-full -skew-x-6 border border-mw-edge/60 bg-mw-panel/70 p-5 backdrop-blur-sm lg:w-[22rem]">
-              <div className="skew-x-6 space-y-3.5">
-                <Meter label="Grip" value={spec.meters.grip} readout={pct(spec.meters.grip)} />
-                <Meter label="Technical" value={spec.meters.technical} readout={pct(spec.meters.technical)} />
-                <Meter label="Detail" value={spec.meters.detail} readout={spec.fidelityLabel} />
-                <Meter label="Slip" value={spec.meters.slip} readout={pct(spec.meters.slip)} />
-                <div className="flex items-center justify-between border-t border-mw-edge/50 pt-3 font-mono text-[11px] uppercase tracking-wider text-mw-muted">
-                  <span>Spawns</span>
-                  <span className="text-mw-text">{current.manifest.spawnPoints.length}</span>
+            {/* Stat panel — desktop only; too tall for a phone's landscape
+                viewport and would bury the CTAs. */}
+            {!isTouch && (
+              <div className="w-full -skew-x-6 border border-mw-edge/60 bg-mw-panel/70 p-5 backdrop-blur-sm lg:w-[22rem]">
+                <div className="skew-x-6 space-y-3.5">
+                  <Meter label="Grip" value={spec.meters.grip} readout={pct(spec.meters.grip)} />
+                  <Meter label="Technical" value={spec.meters.technical} readout={pct(spec.meters.technical)} />
+                  <Meter label="Detail" value={spec.meters.detail} readout={spec.fidelityLabel} />
+                  <Meter label="Slip" value={spec.meters.slip} readout={pct(spec.meters.slip)} />
+                  <div className="flex items-center justify-between border-t border-mw-edge/50 pt-3 font-mono text-[11px] uppercase tracking-wider text-mw-muted">
+                    <span>Spawns</span>
+                    <span className="text-mw-text">{current.manifest.spawnPoints.length}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </main>
@@ -243,12 +261,14 @@ function MapStage({ tracks }: { tracks: Loaded[] }) {
         </div>
       </footer>
 
-      <Link
-        to="/dev"
-        className="absolute bottom-1.5 right-3 z-20 font-mono text-[10px] uppercase tracking-[0.3em] text-mw-muted/40 transition-colors hover:text-mw-accent"
-      >
-        dev
-      </Link>
+      {!isTouch && (
+        <Link
+          to="/dev"
+          className="absolute bottom-1.5 right-3 z-20 font-mono text-[10px] uppercase tracking-[0.3em] text-mw-muted/40 transition-colors hover:text-mw-accent"
+        >
+          dev
+        </Link>
+      )}
     </Shell>
   );
 }
