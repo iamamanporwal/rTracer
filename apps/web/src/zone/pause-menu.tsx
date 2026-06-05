@@ -69,9 +69,9 @@ export function PauseMenu({
           top: 'max(env(safe-area-inset-top), 0.75rem)',
           left: 'max(env(safe-area-inset-left), 0.75rem)',
         }}
-        className="absolute z-30 grid h-11 w-11 touch-none place-items-center rounded-full border border-white/25 bg-black/40 text-white/90 backdrop-blur-md active:scale-95"
+        className="absolute z-30 grid h-[3.25rem] w-[3.25rem] touch-none place-items-center rounded-full border-2 border-white/55 bg-black/45 text-white backdrop-blur-md shadow-[0_3px_22px_rgba(0,0,0,0.6)] active:scale-95"
       >
-        <Pause size={20} strokeWidth={2.5} />
+        <Pause size={24} strokeWidth={2.5} />
       </button>
 
       {!open ? null : (

@@ -206,22 +206,23 @@ function Hud(props: {
   const { x, y, z } = props.stats.position;
 
   // On touch the top-left is the pause chip and the bottom corners are the
-  // driving pad, so the HUD collapses to a compact speed readout that hugs the
-  // safe area. Camera / weather / FPS / position live in the pause menu and
-  // debug overlay instead — they'd only clutter a phone screen.
+  // driving pad, so the HUD collapses to a small speed readout that hugs the
+  // safe area — kept deliberately compact so it never competes with the road or
+  // the buttons. Camera / weather / FPS / position live in the pause menu
+  // instead; mobile carries no dev/debug readout at all.
   if (props.isTouch) {
     return (
       <div
-        className="absolute z-30 rounded-md bg-black/45 px-3 py-1.5 text-right font-mono backdrop-blur"
+        className="absolute z-30 rounded bg-black/40 px-2 py-0.5 text-right font-mono backdrop-blur"
         style={{
-          top: 'max(env(safe-area-inset-top), 0.75rem)',
-          right: 'max(env(safe-area-inset-right), 0.75rem)',
+          top: 'max(env(safe-area-inset-top), 0.5rem)',
+          right: 'max(env(safe-area-inset-right), 0.5rem)',
         }}
       >
-        <span data-testid="hud-speed-kmh" className="text-2xl leading-none text-trace-fg">
+        <span data-testid="hud-speed-kmh" className="text-base leading-none text-trace-fg">
           {kmh.toFixed(0)}
         </span>
-        <span className="ml-1 text-[10px] uppercase tracking-wider text-trace-muted">km/h</span>
+        <span className="ml-0.5 text-[8px] uppercase tracking-wider text-trace-muted">km/h</span>
       </div>
     );
   }

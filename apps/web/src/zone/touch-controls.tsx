@@ -57,7 +57,7 @@ export function TouchControls({ session }: { session: ZoneSession | null }) {
           onPress={() => t?.setHandbrake(true)}
           onRelease={() => t?.setHandbrake(false)}
         >
-          <span className="font-display text-xs font-semibold uppercase tracking-widest">Drift</span>
+          <span className="font-display text-sm font-semibold uppercase tracking-widest">Drift</span>
         </HoldButton>
       </div>
 
@@ -87,9 +87,9 @@ export function TouchControls({ session }: { session: ZoneSession | null }) {
 type Tone = 'neutral' | 'accel' | 'brake';
 
 const TONE_RING: Record<Tone, string> = {
-  neutral: 'border-white/30 text-white/85 active:bg-white/20',
-  accel: 'border-emerald-300/50 text-emerald-100 active:bg-emerald-400/30',
-  brake: 'border-rose-300/50 text-rose-100 active:bg-rose-400/30',
+  neutral: 'border-white/55 text-white active:bg-white/25',
+  accel: 'border-emerald-300/75 text-emerald-50 active:bg-emerald-400/40',
+  brake: 'border-rose-300/75 text-rose-50 active:bg-rose-400/40',
 };
 
 function HoldButton({
@@ -123,9 +123,13 @@ function HoldButton({
     onRelease();
   };
 
+  // Sized off the viewport's wide axis (the mobile shell locks landscape), so
+  // the pad scales from a small phone up to a tablet. Bumped well past the 44 px
+  // touch-target floor — these are the primary driving controls and must read
+  // clearly at arm's length.
   const size = small
-    ? 'h-[clamp(3rem,9vw,4rem)] w-[clamp(4.5rem,16vw,6.5rem)] rounded-2xl'
-    : 'h-[clamp(4.5rem,15vw,7rem)] w-[clamp(4.5rem,15vw,7rem)] rounded-3xl';
+    ? 'h-[clamp(3.5rem,10vw,5rem)] w-[clamp(5.5rem,18vw,8.5rem)] rounded-2xl'
+    : 'h-[clamp(5.5rem,17vw,9rem)] w-[clamp(5.5rem,17vw,9rem)] rounded-3xl';
 
   return (
     <button
@@ -138,8 +142,8 @@ function HoldButton({
       onLostPointerCapture={release}
       onContextMenu={(e) => e.preventDefault()}
       className={
-        'grid touch-none place-items-center border bg-black/25 backdrop-blur-md transition-transform duration-75 ' +
-        'shadow-[0_2px_18px_rgba(0,0,0,0.45)] ' +
+        'grid touch-none place-items-center border-2 bg-black/45 backdrop-blur-md transition-transform duration-75 ' +
+        'shadow-[0_3px_22px_rgba(0,0,0,0.6)] ' +
         size +
         ' ' +
         TONE_RING[tone] +

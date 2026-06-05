@@ -74,6 +74,10 @@ export type SessionStats = {
   headingDeg: number;
 };
 
+/** Shared zero position handed to `onStats` on mobile, where the dev/debug
+ * position+heading readout isn't shown — avoids a per-frame allocation. */
+const ZERO_POSITION = { x: 0, y: 0, z: 0 };
+
 /** Metres above the raycast-found surface to seat a car in a GLB world — the
  * chassis-centre height. Matches zone_alpha's flat-ground spawn (0.5): low
  * enough that the car barely drops (no settle bounce, no tunnel-prone
@@ -471,9 +475,15 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       engineAudio.update(spd, lastThrottle > 0 ? lastThrottle : spd < 1 ? lastBrake : 0);
 
       if (onStats) {
-        const q = lerpedSnap.rotation;
-        const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
-        onStats({ speedMs: spd, fps, position: lerpedSnap.position, headingDeg: (yaw * 180) / Math.PI });
+        if (mobile) {
+          // Mobile shows speed only — no dev/debug position+heading readout, so
+          // skip the per-frame yaw math and pass a shared zero (alloc-free).
+          onStats({ speedMs: spd, fps, position: ZERO_POSITION, headingDeg: 0 });
+        } else {
+          const q = lerpedSnap.rotation;
+          const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
+          onStats({ speedMs: spd, fps, position: lerpedSnap.position, headingDeg: (yaw * 180) / Math.PI });
+        }
       }
     },
   });

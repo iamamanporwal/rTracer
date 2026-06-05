@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Car, Truck, Loader2, TriangleAlert } from 'l
 import { vehicleBundleDir, type VehicleManifest } from '@trace/core';
 import { useStore } from '~/store';
 import { loadVehicleIndex, loadVehicleManifest, useAsync } from '~/manifests';
+import { useIsTouch } from '~/lib/use-device';
 import type { ManifestRef } from '~/store';
 
 /**
@@ -64,6 +65,10 @@ function GarageStage({ cars }: { cars: Loaded[] }) {
   const navigate = useNavigate();
   const selectVehicle = useStore((s) => s.vehicle.selectVehicle);
   const selectedZone = useStore((s) => s.zone.selectedZone);
+  // Touch screens are short and wide (locked landscape). The full stat panel
+  // overflows there and hides the launch CTA, so on touch we strip it down to
+  // just the car name, the track, and the Drive button.
+  const isTouch = useIsTouch();
 
   const [i, setI] = useState(0);
   const total = cars.length;
@@ -146,18 +151,28 @@ function GarageStage({ cars }: { cars: Loaded[] }) {
             className="mw-rise mx-auto grid w-full max-w-6xl items-end gap-8 lg:grid-cols-[1fr_auto]"
           >
             <div>
-              <div className="flex items-center gap-3 font-display text-sm uppercase tracking-[0.35em] text-mw-accent">
-                <span className="h-2 w-2 -skew-x-12 bg-mw-accent" />
-                Class · {spec.classLabel}
-              </div>
-              <h1 className="mt-2 font-display text-5xl font-bold uppercase leading-[0.9] tracking-tight text-mw-text sm:text-6xl lg:text-7xl xl:text-8xl">
+              {!isTouch && (
+                <div className="flex items-center gap-3 font-display text-sm uppercase tracking-[0.35em] text-mw-accent">
+                  <span className="h-2 w-2 -skew-x-12 bg-mw-accent" />
+                  Class · {spec.classLabel}
+                </div>
+              )}
+              <h1
+                className={
+                  isTouch
+                    ? 'font-display text-3xl font-bold uppercase leading-[0.95] tracking-tight text-mw-text sm:text-4xl'
+                    : 'mt-2 font-display text-5xl font-bold uppercase leading-[0.9] tracking-tight text-mw-text sm:text-6xl lg:text-7xl xl:text-8xl'
+                }
+              >
                 {current.manifest.displayName}
               </h1>
-              <div className="mt-3 font-mono text-xs uppercase tracking-[0.25em] text-mw-muted">
-                {spec.drivetrain} · {spec.powerHp} HP · {spec.gearLabel} · {spec.redline} RPM
-              </div>
+              {!isTouch && (
+                <div className="mt-3 font-mono text-xs uppercase tracking-[0.25em] text-mw-muted">
+                  {spec.drivetrain} · {spec.powerHp} HP · {spec.gearLabel} · {spec.redline} RPM
+                </div>
+              )}
 
-              <div className="mt-7 flex flex-wrap items-center gap-4">
+              <div className={(isTouch ? 'mt-4' : 'mt-7') + ' flex flex-wrap items-center gap-4'}>
                 <button
                   type="button"
                   onClick={drive}
@@ -178,19 +193,22 @@ function GarageStage({ cars }: { cars: Loaded[] }) {
               </div>
             </div>
 
-            {/* Stat panel */}
-            <div className="w-full -skew-x-6 border border-mw-edge/60 bg-mw-panel/70 p-5 backdrop-blur-sm lg:w-[22rem]">
-              <div className="skew-x-6 space-y-3.5">
-                <Meter label="Power" value={spec.meters.power} readout={`${spec.powerHp} hp`} />
-                <Meter label="Top Speed" value={spec.meters.top} readout={`${spec.topKmh} km/h`} />
-                <Meter label="Grip" value={spec.meters.grip} readout={pct(spec.meters.grip)} />
-                <Meter label="Agility" value={spec.meters.agility} readout={pct(spec.meters.agility)} />
-                <div className="flex items-center justify-between border-t border-mw-edge/50 pt-3 font-mono text-[11px] uppercase tracking-wider text-mw-muted">
-                  <span>Weight</span>
-                  <span className="text-mw-text">{(current.manifest.mass / 1000).toFixed(2)} t</span>
+            {/* Stat panel — desktop only; it's too tall for a phone's landscape
+                viewport and would bury the Drive CTA. */}
+            {!isTouch && (
+              <div className="w-full -skew-x-6 border border-mw-edge/60 bg-mw-panel/70 p-5 backdrop-blur-sm lg:w-[22rem]">
+                <div className="skew-x-6 space-y-3.5">
+                  <Meter label="Power" value={spec.meters.power} readout={`${spec.powerHp} hp`} />
+                  <Meter label="Top Speed" value={spec.meters.top} readout={`${spec.topKmh} km/h`} />
+                  <Meter label="Grip" value={spec.meters.grip} readout={pct(spec.meters.grip)} />
+                  <Meter label="Agility" value={spec.meters.agility} readout={pct(spec.meters.agility)} />
+                  <div className="flex items-center justify-between border-t border-mw-edge/50 pt-3 font-mono text-[11px] uppercase tracking-wider text-mw-muted">
+                    <span>Weight</span>
+                    <span className="text-mw-text">{(current.manifest.mass / 1000).toFixed(2)} t</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </main>
@@ -231,13 +249,15 @@ function GarageStage({ cars }: { cars: Loaded[] }) {
         </div>
       </footer>
 
-      {/* Discreet dev-mode entry (buried in Settings in M2) */}
-      <Link
-        to="/dev"
-        className="absolute bottom-1.5 right-3 z-20 font-mono text-[10px] uppercase tracking-[0.3em] text-mw-muted/40 transition-colors hover:text-mw-accent"
-      >
-        dev
-      </Link>
+      {/* Discreet dev-mode entry (buried in Settings in M2) — desktop only. */}
+      {!isTouch && (
+        <Link
+          to="/dev"
+          className="absolute bottom-1.5 right-3 z-20 font-mono text-[10px] uppercase tracking-[0.3em] text-mw-muted/40 transition-colors hover:text-mw-accent"
+        >
+          dev
+        </Link>
+      )}
     </Shell>
   );
 }
