@@ -65,4 +65,4 @@ This commit is the Phase 0 foundation per blueprint §20:
 
 ## Contributing
 
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and cite blueprint task IDs in PR titles.
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and cite blueprint task IDs in PR titles
