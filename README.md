@@ -1,6 +1,6 @@
 # Trace
 
-Browser-native motorsport sandbox. Hub world + addressable zones + a player passport.
+Browser-native motorsport sandbox. Hub world + addressable zones + a player passport
 
 > The binding spec is [`Docs/TRACE_BLUEPRINT.md`](Docs/TRACE_BLUEPRINT.md).
 > Architecture in §1–§18, week-by-week plan in §19–§24. Cite section numbers
