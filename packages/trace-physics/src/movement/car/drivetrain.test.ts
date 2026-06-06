@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { VehicleManifest } from '@trace/core';
 import { NEUTRAL_INPUT, type ControlInput } from '../../input';
 import { computeDriveCommand, deriveDrivetrainParams } from './drivetrain';
-import { FORWARD_SIGN, resolveCarFeel } from './config';
+import {
+  DEFAULT_HANDBRAKE_FORCE_MUL,
+  FORWARD_SIGN,
+  G,
+  resolveCarFeel,
+} from './config';
 
 /**
  * Pure force-model tests. No Rapier — just the arcade drivetrain math: throttle
@@ -76,10 +81,51 @@ describe('computeDriveCommand', () => {
     expect(cmd.rearBrake).toBe(0);
   });
 
+  it('foot brake (S) is ≈1/handbrakeForceMul of the handbrake (Space) — the "65% of Space" feel', () => {
+    // Handbrake total acts on the rear only; foot brake total is split front+rear.
+    const hb = computeDriveCommand(input({ handbrake: 1 }), 0, params);
+    const fb = computeDriveCommand(input({ brake: 1 }), 5 * FORWARD_SIGN, params);
+    const handTotal = hb.rearHandbrake * params.rearCount;
+    const footTotal = fb.frontBrake * params.frontCount + fb.rearBrake * params.rearCount;
+    expect(handTotal).toBeGreaterThan(footTotal); // Space is the firmer brake
+    expect(footTotal / handTotal).toBeCloseTo(1 / params.handbrakeForceMul, 5);
+  });
+
   it('steering lock shrinks as speed rises', () => {
     const slow = computeDriveCommand(input({ steering: 1 }), 0, params);
     const fast = computeDriveCommand(input({ steering: 1 }), 30 * FORWARD_SIGN, params);
     expect(Math.abs(fast.steerAngle)).toBeLessThan(Math.abs(slow.steerAngle));
     expect(Math.abs(slow.steerAngle)).toBeGreaterThan(0);
+  });
+});
+
+describe('resolveCarFeel tuning overrides (per-car tweakability)', () => {
+  it('falls back to package defaults when tuning is absent', () => {
+    const feel = resolveCarFeel(MANIFEST);
+    expect(feel.handbrakeForceMul).toBe(DEFAULT_HANDBRAKE_FORCE_MUL);
+    expect(feel.maxReverseSpeedMul).toBe(1);
+  });
+
+  it('threads every new dynamics knob through from manifest.tuning', () => {
+    const tuned: VehicleManifest = {
+      ...MANIFEST,
+      tuning: {
+        handbrakeForceMul: 2.2,
+        maxReverseSpeedMul: 0.5,
+        linearDamping: 0.04,
+        engineBrakeG: 0.2,
+        holdG: 0.6,
+        antirollKp: 80,
+        antirollKd: 20,
+      },
+    };
+    const feel = resolveCarFeel(tuned);
+    expect(feel.handbrakeForceMul).toBe(2.2);
+    expect(feel.maxReverseSpeedMul).toBe(0.5);
+    expect(feel.linearDamping).toBe(0.04);
+    expect(feel.engineBrakeDecelMs2).toBeCloseTo(0.2 * G, 5);
+    expect(feel.holdDecelMs2).toBeCloseTo(0.6 * G, 5);
+    expect(feel.antirollKp).toBe(80);
+    expect(feel.antirollKd).toBe(20);
   });
 });

@@ -2,12 +2,14 @@ import * as THREE from 'three';
 
 /**
  * Camera rig per blueprint §21.2 (P1-16) — a GTA-style follow camera with
- * switchable modes. Three modes cycle on the C key:
+ * switchable modes. Four modes cycle on the C key:
  *
- *   - **default** (Chase): spline-damped chase behind and above the car, kept
- *     centered in frame, with a GTA orbit (mouse yaw/pitch swings around the car
- *     and gently drifts back behind the heading when idle).
- *   - **wide**: same chase, pulled back with a wide field of view — cinematic.
+ *   - **chase** (NFS:MW): gimbal-stable chase locked behind the car. Ignores the
+ *     mouse entirely — it tracks the car's heading on a damped spring and never
+ *     free-looks, so it always frames where you're going. This is the default.
+ *   - **default** (Free): the same chase, but the mouse yaw/pitch/zoom orbits
+ *     freely around the car and holds wherever the player leaves it.
+ *   - **wide**: free chase pulled back with a wide field of view — cinematic.
  *   - **fpv**: first-person from the driver's seat, looking down the car's
  *     heading, with mouse free-look. Stays upright (no roll) for comfort.
  *
@@ -24,11 +26,12 @@ import * as THREE from 'three';
  * what keeps both jitter-free when the car is fast: there is no second clock and
  * no relative drift between what the camera tracks and where the car is drawn.
  */
-export type CameraMode = 'default' | 'wide' | 'fpv';
+export type CameraMode = 'chase' | 'default' | 'wide' | 'fpv';
 
-/** Ordered cycle for the C key, with HUD labels. */
+/** Ordered cycle for the C key, with HUD labels. Chase (locked) is first → default. */
 export const CAMERA_MODES: readonly { id: CameraMode; label: string }[] = [
-  { id: 'default', label: 'Chase' },
+  { id: 'chase', label: 'Chase' },
+  { id: 'default', label: 'Free' },
   { id: 'wide', label: 'Wide' },
   { id: 'fpv', label: 'First-person' },
 ];
@@ -100,7 +103,18 @@ type ChaseParams = {
 };
 
 // Tuned so the whole (lifted, tall) car sits centered with a little ground below.
-const CHASE: Record<'default' | 'wide', ChaseParams> = {
+const CHASE: Record<'chase' | 'default' | 'wide', ChaseParams> = {
+  // NFS:MW-style locked chase. Slightly higher/further than the free chase and a
+  // touch tighter on damping so it reads as rigidly gimbal-mounted behind the car
+  // — it eases onto the heading through a turn, then settles dead-centre. Orbit
+  // and zoom are ignored in this mode (see `computeChase` ignoreControl).
+  chase: {
+    offset: new THREE.Vector3(0, 2.1, -7.2),
+    lookOffset: new THREE.Vector3(0, 0.55, 0.6),
+    fov: 62,
+    posDamp: 10,
+    lookDamp: 11,
+  },
   default: {
     offset: new THREE.Vector3(0, 2.2, -6.8),
     lookOffset: new THREE.Vector3(0, 0.55, 0.5),
@@ -132,9 +146,12 @@ export function createCameraRig(options: CameraRigOptions = {}): CameraRig {
   const seat = options.seat ?? [0.35, 0.95, 0.15];
   const eyeLocal = new THREE.Vector3(seat[0] * 0.5, seat[1] + 0.18, seat[2] + 0.1);
 
-  let mode: CameraMode = 'default';
+  // Start in the locked NFS chase — the documented default and CAMERA_MODES[0].
+  // The session re-asserts it via setCameraMode(0); matching here keeps the
+  // constructor honest and avoids a one-frame FOV pop if a frame renders first.
+  let mode: CameraMode = 'chase';
 
-  const camera = new THREE.PerspectiveCamera(CHASE.default.fov, 1, 0.1, 2000);
+  const camera = new THREE.PerspectiveCamera(CHASE.chase.fov, 1, 0.1, 2000);
   camera.position.set(0, 4, -10);
   camera.lookAt(0, 0, 0);
 
@@ -160,14 +177,20 @@ export function createCameraRig(options: CameraRigOptions = {}): CameraRig {
     targetQuat: THREE.Quaternion,
     control: CameraControl,
     p: ChaseParams,
+    ignoreControl: boolean,
   ): void {
     const carYaw = yawFromQuaternion(targetQuat);
+    // Locked chase ignores the orbit/zoom entirely — it stays rigidly behind the
+    // car's heading (NFS:MW). Free chase adds the mouse yaw/pitch and wheel zoom.
+    const pitch = ignoreControl ? 0 : control.pitch;
+    const orbitYaw = ignoreControl ? 0 : control.yaw;
+    const distance = ignoreControl ? 1 : control.distance;
     // Position: pitch the offset about X, yaw about Y (heading + orbit), zoom.
-    pitchQuat.setFromAxisAngle(RIGHT, control.pitch);
-    yawQuat.setFromAxisAngle(UP, carYaw + control.yaw);
+    pitchQuat.setFromAxisAngle(RIGHT, pitch);
+    yawQuat.setFromAxisAngle(UP, carYaw + orbitYaw);
     desiredPos
       .copy(p.offset)
-      .multiplyScalar(control.distance)
+      .multiplyScalar(distance)
       .applyQuaternion(pitchQuat)
       .applyQuaternion(yawQuat)
       .add(targetPos);
@@ -202,7 +225,8 @@ export function createCameraRig(options: CameraRigOptions = {}): CameraRig {
       return FPV;
     }
     const p = CHASE[mode];
-    computeChase(targetPos, targetQuat, control, p);
+    // 'chase' is the locked NFS cam — it ignores the mouse orbit/zoom.
+    computeChase(targetPos, targetQuat, control, p, mode === 'chase');
     return p;
   }
 

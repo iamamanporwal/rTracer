@@ -174,8 +174,8 @@ function clamp(v: number, lo: number, hi: number): number {
  * lengths because the front rides stiffer.
  */
 export function deriveRestHubLocalY(
-  wheels: ReadonlyArray<Pick<WheelGeometry, 'connection'>>,
-  suspensionLengths: ReadonlyArray<number>,
+  wheels: readonly Pick<WheelGeometry, 'connection'>[],
+  suspensionLengths: readonly number[],
 ): number {
   if (wheels.length === 0) return 0;
   let sum = 0;

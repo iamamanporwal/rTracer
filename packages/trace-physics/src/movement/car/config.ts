@@ -59,21 +59,33 @@ export const REVERSE_THRESHOLD_MS = 0.3;
 /** Default acceleration cap (m/s²) so raw power can't launch/flip the car. */
 export const DEFAULT_DRIVE_ACCEL_MS2 = 5.5;
 /**
- * Default peak braking deceleration (m/s²). Tuned down from 8 → 6 so the
- * default S-brake doesn't pitch the chassis into a stoppie even before ABS
- * modulation kicks in. Sport cars override via `manifest.tuning.brakeDecelG`.
+ * Default peak braking deceleration (m/s²) — the *budget* both pedals scale.
+ * The foot brake (S) uses it at full strength across all four wheels; the
+ * handbrake (Space) multiplies it by {@link DEFAULT_HANDBRAKE_FORCE_MUL} on the
+ * locked rear so Space is the stronger reference and S lands at ≈1/mul of it
+ * (the "S = ~65 % of Space" request). 9 m/s² ≈ 0.92 g — a firm, planted stop;
+ * the brake input ramp (`input.ts`) plus the anti-pitch rate damping in the
+ * stabilizer keep this from pitching the chassis into a stoppie. Sport cars
+ * override via `manifest.tuning.brakeDecelG`.
  */
-export const DEFAULT_PEAK_DECEL_MS2 = 6;
+export const DEFAULT_PEAK_DECEL_MS2 = 9;
+/**
+ * Handbrake (Space) force as a multiple of the foot-brake budget. >1 makes the
+ * handbrake the firmer brake, so the foot brake (S) is ≈1/mul = 67 % of it —
+ * the "same as Space but 60–70 % power" feel. Also lends Space a harder rear
+ * lock for drift initiation. Overridable via `manifest.tuning.handbrakeForceMul`.
+ */
+export const DEFAULT_HANDBRAKE_FORCE_MUL = 1.5;
 /** Default reverse acceleration — weaker than forward, still perceptible. */
 export const DEFAULT_REVERSE_ACCEL_MS2 = 4.5;
 /**
- * Top reverse speed (m/s). Tuned to ≈13 km/h (10–15 km/h band) so reverse
- * matches real-car feel — fast enough to manoeuvre, slow enough to be safe.
- * The drivetrain holds full reverse force up to {@link REVERSE_PLATEAU_FRAC}
- * of this value, then tapers to zero at the cap so the approach is smooth
- * instead of a cliff.
+ * Top reverse speed (m/s) ≈ 50 km/h — fast enough to back out of a corner at
+ * pace, matching the player-requested reverse cap. The drivetrain holds full
+ * reverse force up to {@link REVERSE_PLATEAU_FRAC} of this value, then tapers to
+ * zero at the cap so the approach is smooth instead of a cliff. Scaled per car
+ * by `manifest.tuning.maxReverseSpeedMul`.
  */
-export const MAX_REVERSE_SPEED_MS = 3.6;
+export const MAX_REVERSE_SPEED_MS = 13.89;
 /**
  * Fraction of {@link MAX_REVERSE_SPEED_MS} where the reverse force *starts*
  * tapering. Below this fraction, force is at 100 % — gives a punchy, responsive
@@ -83,8 +95,88 @@ export const MAX_REVERSE_SPEED_MS = 3.6;
 export const REVERSE_PLATEAU_FRAC = 0.8;
 /** Default brake bias — 60 % front / 40 % rear (per the brake-fix spec). */
 export const DEFAULT_FRONT_BRAKE_BIAS = 0.6;
-export const DEFAULT_MAX_STEER_DEG = 32;
-export const DEFAULT_STEER_SPEED_SCALE = 18;
+/** Default steering lock (deg). Trimmed 32 → 30 so corner entry is less twitchy. */
+export const DEFAULT_MAX_STEER_DEG = 30;
+/**
+ * Speed (m/s) at which steering lock has halved. Raised 18 → 22 so the lock
+ * fades a touch more gently with speed — the car still tightens up at pace
+ * (less twitch, less roll moment) without feeling numb in fast sweepers.
+ */
+export const DEFAULT_STEER_SPEED_SCALE = 22;
+
+// ── Coasting drag ────────────────────────────────────────────────────────────
+/**
+ * Chassis linear damping — velocity-proportional drag (Rapier units). Kept low
+ * so a car coasting at speed carries its momentum instead of braking itself down
+ * the instant the player lifts off (the high-speed term is `damping × speed`, so
+ * this is what dominates coast-down at 200+ km/h). The *firm* low-speed stop is
+ * the speed-gated engine braking + auto-hold below, not this. Per-car via
+ * `manifest.tuning.linearDamping`.
+ */
+export const DEFAULT_LINEAR_DAMPING = 0.02;
+
+// ── Off-throttle behaviour: engine braking + auto-hold (creep arrest) ─────────
+/**
+ * Engine-braking deceleration (m/s²) applied at the wheels when the player is
+ * off both pedals — but ONLY below {@link COAST_BRAKE_FADE_END_MS}, ramping to
+ * full at/under {@link COAST_BRAKE_FADE_START_MS}. So lifting off at speed lets
+ * the car coast freely (realistic momentum), while under ~50 km/h it bleeds the
+ * last of the speed off in a couple of seconds before the auto-hold parks it.
+ * Per-car via `manifest.tuning.engineBrakeG`.
+ */
+export const DEFAULT_ENGINE_BRAKE_DECEL_MS2 = 3;
+/**
+ * At/below this speed (m/s ≈ 50 km/h) engine braking is at full strength — this
+ * is the "stops in a couple of seconds, but only when slow" band the player
+ * asked for.
+ */
+export const COAST_BRAKE_FADE_START_MS = 13.89;
+/**
+ * Above this speed (m/s ≈ 75 km/h) engine braking is OFF entirely — high-speed
+ * coasting must keep rolling, not stop itself in a few seconds. Between the two
+ * thresholds it fades linearly.
+ */
+export const COAST_BRAKE_FADE_END_MS = 20.83;
+/**
+ * Auto-hold deceleration (m/s²) — a firm brake clamped onto every wheel once the
+ * car has coasted to a crawl with no pedal input, so it comes to a *complete*
+ * stop and stays put on a slope instead of creeping. 5 m/s² ≈ 0.5 g holds well
+ * past any drivable grade. Per-car via `manifest.tuning.holdG`.
+ */
+export const DEFAULT_HOLD_DECEL_MS2 = 5;
+/**
+ * Engage the auto-hold below this speed (m/s). Kept under {@link
+ * ABS_MIN_VEHICLE_SPEED_MS} so ABS is already disabled at the hold point and the
+ * brake locks solid instead of pulsing.
+ */
+export const HOLD_ENGAGE_MS = 0.9;
+/**
+ * Release the auto-hold once the car is moving faster than this (m/s) — e.g. it
+ * slid off on a steep grade, or the player tapped the throttle. The engage/
+ * release gap is hysteresis so the hold doesn't chatter at the threshold.
+ */
+export const HOLD_RELEASE_MS = 1.4;
+
+// ── Stability assist (anti-roll + anti-pitch-rate) ───────────────────────────
+/**
+ * Anti-roll proportional gain (1/s² — a restoring angular acceleration per rad
+ * of body roll, scaled by the car's roll inertia at use so it's mass-agnostic).
+ * Catches a developing roll-over before it tips; the deadzone below leaves
+ * gentle cornering lean intact. Per-car via `manifest.tuning.antirollKp`.
+ */
+export const DEFAULT_ANTIROLL_KP = 50;
+/**
+ * Anti-roll/anti-pitch derivative gain (1/s). Damps the chassis tilt *rate*
+ * (roll AND pitch, never yaw), so quick tip-ups and brake nose-dives are bled
+ * off while a car settled on a slope is left alone (a static incline has zero
+ * tilt rate). ≈ critical with {@link DEFAULT_ANTIROLL_KP}. Per-car via
+ * `manifest.tuning.antirollKd`.
+ */
+export const DEFAULT_ANTIROLL_KD = 14;
+/** Roll inside this angle (rad) is left untouched — natural cornering lean. */
+export const ANTIROLL_DEADZONE_RAD = 3.5 * DEG;
+/** Clamp the roll fed to the restoring term (rad) so a flipped car can't blow up. */
+export const MAX_ANTIROLL_ANGLE_RAD = Math.PI / 4;
 /** Fraction of chassis half-height the COM sits below center at comHeightScale=1. */
 export const DEFAULT_COM_DROP_FRACTION = 0.8;
 /**
@@ -180,10 +272,24 @@ export const ABS_LOCK_SLIP_MIN_SPEED_MS = 2;
 export type CarFeel = {
   driveAccelMs2: number;
   peakDecelMs2: number;
+  /** Handbrake force as a multiple of the foot-brake budget (Space vs S). */
+  handbrakeForceMul: number;
   reverseAccelMs2: number;
+  /** Reverse top-speed multiplier (1 = {@link MAX_REVERSE_SPEED_MS} ≈ 50 km/h). */
+  maxReverseSpeedMul: number;
   frontBrakeBias: number;
   maxSteerRad: number;
   steerSpeedScale: number;
+  /** Chassis linear damping (velocity-proportional coasting drag). */
+  linearDamping: number;
+  /** Off-throttle engine-braking decel (m/s²), applied speed-gated. */
+  engineBrakeDecelMs2: number;
+  /** Auto-hold decel (m/s²) that arrests creep at a standstill. */
+  holdDecelMs2: number;
+  /** Anti-roll restoring gain (1/s², scaled by roll inertia at use). */
+  antirollKp: number;
+  /** Anti-roll/anti-pitch tilt-rate damping gain (1/s, scaled by roll inertia). */
+  antirollKd: number;
   comHeightScale: number;
   suspensionStiffnessScale: number;
   suspensionTravelScale: number;
@@ -198,10 +304,17 @@ export function resolveCarFeel(manifest: VehicleManifest): CarFeel {
   return {
     driveAccelMs2: t?.driveAccelG != null ? t.driveAccelG * G : DEFAULT_DRIVE_ACCEL_MS2,
     peakDecelMs2: t?.brakeDecelG != null ? t.brakeDecelG * G : DEFAULT_PEAK_DECEL_MS2,
+    handbrakeForceMul: t?.handbrakeForceMul ?? DEFAULT_HANDBRAKE_FORCE_MUL,
     reverseAccelMs2: t?.reverseAccelG != null ? t.reverseAccelG * G : DEFAULT_REVERSE_ACCEL_MS2,
+    maxReverseSpeedMul: t?.maxReverseSpeedMul ?? 1,
     frontBrakeBias: t?.frontBrakeBias ?? DEFAULT_FRONT_BRAKE_BIAS,
     maxSteerRad: (t?.maxSteerDeg ?? DEFAULT_MAX_STEER_DEG) * DEG,
     steerSpeedScale: t?.steerSpeedScale ?? DEFAULT_STEER_SPEED_SCALE,
+    linearDamping: t?.linearDamping ?? DEFAULT_LINEAR_DAMPING,
+    engineBrakeDecelMs2: t?.engineBrakeG != null ? t.engineBrakeG * G : DEFAULT_ENGINE_BRAKE_DECEL_MS2,
+    holdDecelMs2: t?.holdG != null ? t.holdG * G : DEFAULT_HOLD_DECEL_MS2,
+    antirollKp: t?.antirollKp ?? DEFAULT_ANTIROLL_KP,
+    antirollKd: t?.antirollKd ?? DEFAULT_ANTIROLL_KD,
     comHeightScale: t?.comHeightScale ?? 1,
     suspensionStiffnessScale: t?.suspensionStiffnessScale ?? 1,
     suspensionTravelScale: t?.suspensionTravelScale ?? 1,

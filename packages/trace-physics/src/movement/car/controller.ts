@@ -14,15 +14,21 @@ import {
   ABS_LOCK_SLIP_VALUE,
   ABS_MIN_VEHICLE_SPEED_MS,
   ABS_RELEASE_RAD_S,
+  ANTIROLL_DEADZONE_RAD,
   AXLE_DIR,
   BURNOUT_DRIVEN_SIDE_GRIP_MUL,
   BURNOUT_DRIVEN_SLIP_MUL,
   BURNOUT_FRONT_BRAKE_FRAC,
   BURNOUT_INPUT_THRESHOLD,
   BURNOUT_MAX_SPEED_MS,
+  COAST_BRAKE_FADE_END_MS,
+  COAST_BRAKE_FADE_START_MS,
   FORWARD_AXIS,
   FORWARD_SIGN,
   HANDBRAKE_SLIP_REF_SPEED_MS,
+  HOLD_ENGAGE_MS,
+  HOLD_RELEASE_MS,
+  MAX_ANTIROLL_ANGLE_RAD,
   MAX_REVERSE_SPEED_MS,
   resolveCarFeel,
   SUSPENSION_DIR,
@@ -70,6 +76,12 @@ export function createCarController(
   const drivetrain = deriveDrivetrainParams(manifest, feel);
   const wheelCount = chassis.wheels.length;
 
+  // Roll inertia (about the chassis-local forward axis = Z) — used to scale the
+  // stability-assist torque so a heavy SUV and a light coupe get the same
+  // *response*, not the same raw N·m. Floored so a degenerate manifest can't
+  // zero the assist out.
+  const rollInertia = Math.max(manifest.inertiaTensor[FORWARD_AXIS] ?? 0, 1);
+
   // Wheelbase (distance between front + rear axles in chassis-local Z) is
   // needed for the reverse bicycle-model yaw — see the reverse propulsion
   // section below. Falls back to 1 m if the rig somehow has all wheels at z=0
@@ -94,7 +106,7 @@ export function createCarController(
       z: spawn.rotation[2],
       w: spawn.rotation[3],
     })
-    .setLinearDamping(0.05)
+    .setLinearDamping(feel.linearDamping)
     .setAngularDamping(0.6);
   // Supply mass with a low, central COM for roll resistance; the collider is
   // massless so the two don't stack.
@@ -195,6 +207,15 @@ export function createCarController(
   const worldBack = { x: 0, y: 0, z: 0 };
   const linvelOut = { x: 0, y: 0, z: 0 };
   const angvelOut = { x: 0, y: 0, z: 0 };
+  // Scratch for the stability assist (anti-roll + tilt-rate damping).
+  // `qConj` holds the chassis rotation's conjugate (to map world-up into body
+  // space for the roll angle); `localUp`/`worldFwd`/`worldUp` are rotated unit
+  // axes; `stabilizerOut` is the world-space torque handed to addTorque.
+  const qConj = { x: 0, y: 0, z: 0, w: 1 };
+  const localUp = { x: 0, y: 0, z: 0 };
+  const worldFwd = { x: 0, y: 0, z: 0 };
+  const worldUp = { x: 0, y: 0, z: 0 };
+  const stabilizerOut = { x: 0, y: 0, z: 0 };
 
   let initialSpawn: MovementSpawn = {
     position: [...spawn.position] as Vec3,
@@ -218,6 +239,11 @@ export function createCarController(
   // commanded velocity and a wheel-derived value — the chassis still moves at
   // the slammed speed, but the readings flicker).
   let reverseSpeed = 0;
+  // Auto-hold latch: once the car has coasted to a crawl with no pedal input we
+  // clamp a firm brake on so it stops dead and holds on a slope. Latched (with
+  // engage/release hysteresis below) so it can't brake/creep/brake oscillate at
+  // the threshold. Cleared by any pedal input or by the car sliding off.
+  let holdLatched = false;
 
   function update(input: ControlInput, dt: number): void {
     const ci = clampInput(input);
@@ -298,6 +324,36 @@ export function createCarController(
     const burnoutFrontBrake =
       (drivetrain.maxBrakeTotal * BURNOUT_FRONT_BRAKE_FRAC) / drivetrain.frontCount;
 
+    // ── Off-throttle coast-down + auto-hold (creep arrest) ─────────────────────
+    // With no pedal touched we add a brake on EVERY wheel: a gentle engine-brake
+    // while rolling so the car coasts down instead of drifting forever, and a
+    // firm latched hold once it crawls to a stop so it settles dead and stays
+    // put on a slope (the "car never stops / creeps when idle" fix). This is a
+    // controller-side brake — kept out of computeDriveCommand so the drivetrain's
+    // standstill→reverse contract is untouched. Reverse mode owns its own motion
+    // (linvel bypass), so we never fight it here.
+    const coasting =
+      !isReverseMode && ci.throttle === 0 && ci.brake === 0 && ci.handbrake === 0;
+    if (coasting && absSpeedForSlip < HOLD_ENGAGE_MS) holdLatched = true;
+    if (!coasting || absSpeedForSlip > HOLD_RELEASE_MS) holdLatched = false;
+    let coastBrakePerWheel = 0;
+    if (coasting) {
+      let decel: number;
+      if (holdLatched) {
+        decel = feel.holdDecelMs2;
+      } else {
+        // Engine braking only bites below ~50 km/h, fading to zero by ~75 km/h,
+        // so lifting off at speed lets the car coast on its momentum instead of
+        // braking itself to a stop in a few seconds.
+        const fadeRaw =
+          (COAST_BRAKE_FADE_END_MS - absSpeedForSlip) /
+          (COAST_BRAKE_FADE_END_MS - COAST_BRAKE_FADE_START_MS);
+        const fade = fadeRaw < 0 ? 0 : fadeRaw > 1 ? 1 : fadeRaw;
+        decel = feel.engineBrakeDecelMs2 * fade;
+      }
+      coastBrakePerWheel = (decel * body.mass()) / wheelCount;
+    }
+
     for (let i = 0; i < wheelCount; i++) {
       const w = chassis.wheels[i];
       if (!w) continue;
@@ -346,7 +402,11 @@ export function createCarController(
       // Handbrake bypasses ABS (Space must lock the rear for a drift). It's
       // also suppressed while burnout is engaged for non-driven wheels — those
       // are the fronts (steered) and the handbrake should never be on them.
-      const brake = w.isSteered ? modulatedFoot : modulatedFoot + cmd.rearHandbrake;
+      // The coast/hold brake (zero unless the player is off all pedals) rides on
+      // top of every wheel — it never overlaps foot/hand braking, so it can't
+      // double up; at the hold speed ABS is already off so it locks solid.
+      const brake =
+        (w.isSteered ? modulatedFoot : modulatedFoot + cmd.rearHandbrake) + coastBrakePerWheel;
       controller.setWheelBrake(i, brake);
 
       controller.setWheelSteering(i, w.isSteered ? cmd.steerAngle : 0);
@@ -379,6 +439,61 @@ export function createCarController(
 
     controller.updateVehicle(dt);
 
+    // ── Stability assist (anti-roll + tilt-rate damping) ──────────────────────
+    // Keeps the car planted and stops it tipping over in hard cornering, and
+    // bleeds off the brake nose-dive that a firm stop would otherwise produce —
+    // without ever fighting yaw (steering) or a static slope.
+    //
+    // Roll angle: rotate WORLD-up (0,1,0) into chassis space via the rotation's
+    // conjugate. For a level car that's (0,1,0); a sideways lean tips its X, so
+    // roll = atan2(localUp.x, localUp.y) — correct under combined yaw+pitch
+    // (unlike a raw quaternion-component proxy). A restoring torque about the
+    // chassis forward axis, past a small deadzone (natural cornering lean stays),
+    // proportional to the roll, scaled by roll inertia so the *response* is
+    // mass-agnostic. Clamped so a flipped car can't generate an explosive torque.
+    {
+      const q = body.rotation();
+      qConj.x = -q.x;
+      qConj.y = -q.y;
+      qConj.z = -q.z;
+      qConj.w = q.w;
+      rotateByQuat(qConj, 0, 1, 0, localUp);
+      let roll = Math.atan2(localUp.x, localUp.y);
+      if (roll > MAX_ANTIROLL_ANGLE_RAD) roll = MAX_ANTIROLL_ANGLE_RAD;
+      else if (roll < -MAX_ANTIROLL_ANGLE_RAD) roll = -MAX_ANTIROLL_ANGLE_RAD;
+      // Subtract the deadzone (continuous at the edge — no torque step).
+      const activeRoll =
+        roll > ANTIROLL_DEADZONE_RAD
+          ? roll - ANTIROLL_DEADZONE_RAD
+          : roll < -ANTIROLL_DEADZONE_RAD
+            ? roll + ANTIROLL_DEADZONE_RAD
+            : 0;
+
+      // Chassis forward (roll torque axis) and up (yaw axis) in world space.
+      rotateByQuat(q, 0, 0, 1, worldFwd);
+      rotateByQuat(q, 0, 1, 0, worldUp);
+
+      // Tilt rate = angular velocity with its yaw component (about the car's own
+      // up) removed, so we damp roll AND pitch but never the player's steering.
+      const av = body.angvel();
+      const spin = av.x * worldUp.x + av.y * worldUp.y + av.z * worldUp.z;
+      const tiltX = av.x - spin * worldUp.x;
+      const tiltY = av.y - spin * worldUp.y;
+      const tiltZ = av.z - spin * worldUp.z;
+
+      // Restoring torque (about forward) minus rate damping (about the tilt).
+      // Both scaled by roll inertia so kp/kd read as accelerations, not N·m.
+      // Applied as a per-step torque IMPULSE (torque × dt): Rapier's addTorque
+      // persists and accumulates across steps until reset, which would build an
+      // unbounded torque when called every tick — applyTorqueImpulse is one-shot.
+      const restore = -rollInertia * feel.antirollKp * activeRoll;
+      const kd = rollInertia * feel.antirollKd;
+      stabilizerOut.x = (worldFwd.x * restore - kd * tiltX) * dt;
+      stabilizerOut.y = (worldFwd.y * restore - kd * tiltY) * dt;
+      stabilizerOut.z = (worldFwd.z * restore - kd * tiltZ) * dt;
+      body.applyTorqueImpulse(stabilizerOut, true);
+    }
+
     // ── Reverse propulsion bypass ────────────────────────────────────────────
     // Rapier's raycast vehicle propels the chassis through wheel friction. That
     // works for throttle (wheels spin in their natural rolling direction) but
@@ -399,7 +514,7 @@ export function createCarController(
       // Ramp reverseSpeed toward the cap at the per-car reverse acceleration.
       // The cap scales with brake input so partial pedal yields a partial cap.
       const accelMs2 = drivetrain.maxReverseForce / body.mass();
-      const targetMax = MAX_REVERSE_SPEED_MS * ci.brake;
+      const targetMax = MAX_REVERSE_SPEED_MS * feel.maxReverseSpeedMul * ci.brake;
       reverseSpeed = Math.min(reverseSpeed + accelMs2 * dt, targetMax);
 
       // Slam chassis linvel along chassis-local backward (-Z chassis-local,
@@ -552,6 +667,7 @@ export function createCarController(
       true,
     );
     reverseSpeed = 0;
+    holdLatched = false;
   }
 
   function dispose(): void {

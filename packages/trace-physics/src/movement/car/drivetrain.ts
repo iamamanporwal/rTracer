@@ -26,8 +26,10 @@ export type DrivetrainParams = {
   maxEngineForce: number;
   /** Reverse force (N) = mass × reverse accel. */
   maxReverseForce: number;
-  /** Peak total brake force (N) = mass × peak decel. */
+  /** Peak total foot-brake force (N) = mass × peak decel. */
   maxBrakeTotal: number;
+  /** Handbrake force as a multiple of {@link maxBrakeTotal} (Space vs S). */
+  handbrakeForceMul: number;
   /** Number of driven wheels (≥1). */
   drivenCount: number;
   /** Number of braked front wheels (steered), for per-wheel split (≥1). */
@@ -68,6 +70,7 @@ export function deriveDrivetrainParams(manifest: VehicleManifest, feel: CarFeel)
     maxEngineForce: manifest.mass * feel.driveAccelMs2,
     maxReverseForce: manifest.mass * feel.reverseAccelMs2,
     maxBrakeTotal: manifest.mass * feel.peakDecelMs2,
+    handbrakeForceMul: feel.handbrakeForceMul,
     drivenCount,
     frontCount,
     rearCount,
@@ -93,9 +96,11 @@ export function computeDriveCommand(
   const absSpeed = Math.abs(signedSpeed);
 
   let engineForceTotal = 0;
-  // Handbrake always contributes a rear-heavy braking force.
+  // Handbrake always contributes a rear-heavy braking force — stronger than the
+  // foot brake (handbrakeForceMul) so Space is the firmer brake and S lands at
+  // ≈1/mul of it, and so the rear locks hard enough to break away for a drift.
   let footBrakeTotal = 0;
-  const handbrakeTotal = input.handbrake * p.maxBrakeTotal;
+  const handbrakeTotal = input.handbrake * p.maxBrakeTotal * p.handbrakeForceMul;
 
   if (input.throttle > 0) {
     // Power/speed model: force tapers as speed rises, capped for a clean launch.

@@ -120,6 +120,72 @@ describe('car stability', () => {
     expect(Number.isFinite(snap.position.x)).toBe(true);
   });
 
+  it('coasts to a complete stop and holds when the player lifts off (no idle creep)', () => {
+    // Accelerate, then release every input. Engine-braking bleeds the speed and
+    // the auto-hold clamps it to a dead stop — the "car never stops" fix.
+    const { snap } = run([
+      { ctrl: input({ throttle: 1 }), steps: 120 },
+      { ctrl: NEUTRAL_INPUT, steps: 600 },
+    ]);
+    expect(Math.abs(snap.speed)).toBeLessThan(0.1);
+  });
+
+  it('coasts nearly freely at high speed (lifting off does not brake hard)', () => {
+    // The reported bug: lifting off at speed stopped the car in ~2-3 s. Above
+    // ~75 km/h engine braking is OFF, so a second of coasting should shed only a
+    // little speed (gentle drag), not a braking-grade chunk.
+    const physics = createPhysicsWorld();
+    createGround(physics.world, { tag: 'tarmac' });
+    const car = createMovement(physics.world, {
+      kind: 'car',
+      manifest: MANIFEST,
+      profile: PHYSICS_PROFILES.tarmac_circuit,
+      spawn: SPAWN,
+    });
+    for (let i = 0; i < 30; i++) {
+      car.update(NEUTRAL_INPUT, 1 / 60);
+      physics.step();
+    }
+    // Get well above the 75 km/h (20.83 m/s) free-coast threshold.
+    for (let i = 0; i < 600; i++) {
+      car.update(input({ throttle: 1 }), 1 / 60);
+      physics.step();
+    }
+    const fast = Math.abs(car.readSnapshot().speed);
+    // Coast for one second.
+    for (let i = 0; i < 60; i++) {
+      car.update(NEUTRAL_INPUT, 1 / 60);
+      physics.step();
+    }
+    const afterCoast = Math.abs(car.readSnapshot().speed);
+    car.dispose();
+    physics.dispose();
+
+    expect(fast).toBeGreaterThan(20.83); // genuinely in the high-speed regime
+    // A braking-grade stop would shed ~3-4 m/s in a second; free coasting sheds far less.
+    expect(fast - afterCoast).toBeLessThan(2.5);
+  });
+
+  it('reverses up to ≈50 km/h (13.89 m/s)', () => {
+    // Brake from a roll → footbrake kills forward speed → reverse ramps to its
+    // cap. snap.speed reports the tracked reverse speed (positive) while reversing.
+    const { snap } = run([
+      { ctrl: input({ throttle: 1 }), steps: 120 },
+      { ctrl: input({ brake: 1 }), steps: 420 },
+    ]);
+    expect(snap.speed).toBeGreaterThan(12);
+    expect(snap.speed).toBeLessThanOrEqual(14.3);
+  });
+
+  it('stays strongly planted through full-lock cornering (anti-roll, no tip)', () => {
+    // A harder input than the generic upright test — full throttle AND full lock.
+    // The stability assist should keep it near-flat, not just under the 60° flip
+    // line: a much tighter bound than the baseline upright check.
+    const { upY, snap } = run([{ ctrl: input({ throttle: 1, steering: 1 }), steps: 600 }]);
+    expect(upY).toBeGreaterThan(0.9);
+    expect(Number.isFinite(snap.position.x)).toBe(true);
+  });
+
   // Regression: wheels must track the body at speed. The earlier controller read
   // Rapier's cached pre-step hard point, so at speed the wheels trailed the body
   // by ~speed × dt (the "body slides off its wheels" bug). Each wheel's body-local

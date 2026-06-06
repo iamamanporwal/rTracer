@@ -96,14 +96,31 @@ export const VehicleManifestSchema = z.object({
     .object({
       /** Traction-limited launch acceleration cap, in g. */
       driveAccelG: z.number().positive().optional(),
-      /** Peak braking deceleration, in g. */
+      /** Peak braking deceleration (foot brake / S), in g. */
       brakeDecelG: z.number().positive().optional(),
+      /**
+       * Handbrake (Space) force as a multiple of the foot-brake budget. >1 makes
+       * the handbrake the stronger brake, so the foot brake is ≈1/mul of it.
+       */
+      handbrakeForceMul: z.number().positive().optional(),
       /** Reverse acceleration, in g. */
       reverseAccelG: z.number().positive().optional(),
+      /** Reverse top-speed multiplier (1 = ≈50 km/h). */
+      maxReverseSpeedMul: z.number().positive().optional(),
       /** Steering lock at the front wheels, in degrees. */
       maxSteerDeg: z.number().positive().optional(),
       /** Speed (m/s) at which steering lock has halved — lower = twitchier. */
       steerSpeedScale: z.number().positive().optional(),
+      /** Chassis linear damping (coasting drag); lower = freer high-speed coast. */
+      linearDamping: z.number().nonnegative().optional(),
+      /** Off-throttle engine-braking (coast-down) deceleration, in g. */
+      engineBrakeG: z.number().nonnegative().optional(),
+      /** Auto-hold / creep-arrest deceleration at a standstill, in g. */
+      holdG: z.number().nonnegative().optional(),
+      /** Anti-roll restoring gain (1/s², scaled by roll inertia at runtime). */
+      antirollKp: z.number().nonnegative().optional(),
+      /** Anti-roll/anti-pitch tilt-rate damping gain (1/s, scaled by roll inertia). */
+      antirollKd: z.number().nonnegative().optional(),
       /** Front brake torque share, 0..1. */
       frontBrakeBias: z.number().min(0).max(1).optional(),
       /** Multiplier on the (mass-scaled) suspension spring stiffness. */

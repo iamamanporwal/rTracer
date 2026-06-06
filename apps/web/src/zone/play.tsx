@@ -272,8 +272,8 @@ function Hud(props: {
         <span>Invisible Skeleton</span>
       </label>
       <div className="absolute bottom-3 left-3 px-3 py-2 rounded-md bg-black/55 backdrop-blur text-[11px] font-mono text-trace-muted">
-        W/S drive · A/D steer · Space handbrake/drift · R reset · C camera · Y weather · O debug ·
-        Mouse look · Wheel zoom
+        W/S drive · A/D steer · Space handbrake/drift · R reset · C camera (Chase ↔ Free) · Y
+        weather · O debug · Mouse look + wheel zoom (Free cam)
       </div>
       <Link
         to="/"
