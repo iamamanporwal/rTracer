@@ -118,18 +118,17 @@ export const DEFAULT_LINEAR_DAMPING = 0.02;
 // ── Off-throttle engine braking (coast-down), speed-banded ────────────────────
 /**
  * Full engine-braking deceleration (m/s²) applied at the wheels when the player
- * is off all pedals, in the band where it's at full strength
- * ({@link COAST_BRAKE_TAPER_MS}..{@link COAST_BRAKE_FADE_START_MS}). Modelled on
+ * is off all pedals, in the band where it's active
+ * ({@link COAST_BRAKE_TAPER_MS}..{@link COAST_BRAKE_MAX_SPEED_MS}). Modelled on
  * how a real car decelerates on a trailing throttle in a low gear — firm enough
- * to bring a slow car to rest in a second or two, the band the player asked for.
- * Per-car via `manifest.tuning.engineBrakeG`.
+ * to bring a slow car to rest in a second or two. Per-car via
+ * `manifest.tuning.engineBrakeG`.
  *
  * Speed profile (all overridable):
- *   • above {@link COAST_BRAKE_FADE_END_MS} (≈50 km/h) — OFF; momentum carries.
- *   • {@link COAST_BRAKE_FADE_START_MS}..{@link COAST_BRAKE_FADE_END_MS}
- *       (≈25–50 km/h) — fades in linearly.
- *   • {@link COAST_BRAKE_TAPER_MS}..{@link COAST_BRAKE_FADE_START_MS}
- *       (≈5–25 km/h) — full strength.
+ *   • above {@link COAST_BRAKE_MAX_SPEED_MS} (≈25 km/h) — OFF; the car coasts
+ *       freely on its momentum (no engine braking at speed).
+ *   • {@link COAST_BRAKE_TAPER_MS}..{@link COAST_BRAKE_MAX_SPEED_MS}
+ *       (≈5–25 km/h) — full strength (a clean cutoff at the top, no fade).
  *   • below {@link COAST_BRAKE_TAPER_MS} (≈5 km/h) — on a grade (see
  *       {@link SLOPE_DETECT_MS2}) the brake RELEASES so gravity rolls the car
  *       gently; on the flat it stays at full strength so the car stops dead and
@@ -143,10 +142,12 @@ export const DEFAULT_ENGINE_BRAKE_DECEL_MS2 = 3;
  * a dead stop and holds. See {@link SLOPE_DETECT_MS2}.
  */
 export const COAST_BRAKE_TAPER_MS = 1.39;
-/** ≈25 km/h — full engine braking at/below this (down to the taper). */
-export const COAST_BRAKE_FADE_START_MS = 6.94;
-/** ≈50 km/h — engine braking OFF at/above this; fades in between the two. */
-export const COAST_BRAKE_FADE_END_MS = 13.89;
+/**
+ * ≈25 km/h — engine braking applies at full strength at/below this and is OFF
+ * above it (no fade — a clean cutoff). Above this the car coasts freely so
+ * lifting off at speed never brakes the car down.
+ */
+export const COAST_BRAKE_MAX_SPEED_MS = 6.94;
 /**
  * Gravity pull along the car's forward axis (m/s²) above which it's treated as
  * parked on a grade: under ≈5 km/h it then free-rolls (gravity carries it)

@@ -21,8 +21,7 @@ import {
   BURNOUT_FRONT_BRAKE_FRAC,
   BURNOUT_INPUT_THRESHOLD,
   BURNOUT_MAX_SPEED_MS,
-  COAST_BRAKE_FADE_END_MS,
-  COAST_BRAKE_FADE_START_MS,
+  COAST_BRAKE_MAX_SPEED_MS,
   COAST_BRAKE_TAPER_MS,
   FORWARD_AXIS,
   FORWARD_SIGN,
@@ -385,14 +384,11 @@ export function createCarController(
     let coastBrakePerWheel = 0;
     if (parkHeld) {
       coastBrakePerWheel = (feel.holdDecelMs2 * body.mass()) / wheelCount;
-    } else if (coasting && absSpeedForSlip < COAST_BRAKE_FADE_END_MS) {
+    } else if (coasting && absSpeedForSlip < COAST_BRAKE_MAX_SPEED_MS) {
+      // Engine braking only acts below ≈25 km/h (clean cutoff, no fade) — above
+      // that the car coasts freely on its momentum.
       let decel = feel.engineBrakeDecelMs2;
-      if (absSpeedForSlip > COAST_BRAKE_FADE_START_MS) {
-        // Fade out between the full-strength speed and the off speed.
-        decel *=
-          (COAST_BRAKE_FADE_END_MS - absSpeedForSlip) /
-          (COAST_BRAKE_FADE_END_MS - COAST_BRAKE_FADE_START_MS);
-      } else if (onSlope && absSpeedForSlip < COAST_BRAKE_TAPER_MS) {
+      if (onSlope && absSpeedForSlip < COAST_BRAKE_TAPER_MS) {
         // On a grade under ≈5 km/h, release the brake so gravity rolls the car
         // gently. (A tapered-but-nonzero brake would still statically hold it —
         // Rapier locks a braked wheel — so it has to be fully off here.) On the

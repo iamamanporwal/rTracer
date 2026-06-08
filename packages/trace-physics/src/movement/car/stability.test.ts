@@ -121,10 +121,11 @@ describe('car stability', () => {
   });
 
   it('coasts to a stop on flat ground when the player lifts off (no idle creep)', () => {
-    // Accelerate, then release every input. Speed-banded engine braking bleeds
-    // the speed and, with no slope force, the car settles to rest on the flat.
+    // Accelerate to within the engine-braking band (<25 km/h), then release every
+    // input. Engine braking bleeds the speed and, with no slope force, the car
+    // settles to rest on the flat.
     const { snap } = run([
-      { ctrl: input({ throttle: 1 }), steps: 120 },
+      { ctrl: input({ throttle: 1 }), steps: 50 },
       { ctrl: NEUTRAL_INPUT, steps: 600 },
     ]);
     expect(Math.abs(snap.speed)).toBeLessThan(0.1);
@@ -179,7 +180,7 @@ describe('car stability', () => {
 
   it('coasts nearly freely at high speed (lifting off does not brake hard)', () => {
     // The reported bug: lifting off at speed stopped the car in ~2-3 s. Above
-    // ~50 km/h engine braking is OFF, so a second of coasting should shed only a
+    // ~25 km/h engine braking is OFF, so a second of coasting should shed only a
     // little speed (gentle drag), not a braking-grade chunk.
     const physics = createPhysicsWorld();
     createGround(physics.world, { tag: 'tarmac' });
