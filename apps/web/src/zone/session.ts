@@ -119,6 +119,13 @@ export type ZoneSession = {
    */
   setSkeleton(enabled: boolean): void;
   /**
+   * Enable/disable dev mode. Dev mode gates the developer telemetry: the X/Y/Z
+   * position readout (computed per frame only while on) and the O-key skeleton
+   * shortcut. Disabling it forces the skeleton overlay off so the game view
+   * returns fully clean.
+   */
+  setDevMode(enabled: boolean): void;
+  /**
    * On-screen touch control surface — the mobile HUD buttons drive the car
    * through this (throttle / brake / steer / handbrake / reset). No-op on the
    * physics side until the next fixed step samples it.
@@ -276,8 +283,18 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
     debug.setEnabled(on);
     onSkeleton?.(on);
   };
+  // Dev mode gates the developer telemetry. The skeleton overlay and the X/Y/Z
+  // readout are dev-only, surfaced through the pause-menu "Dev Mode" toggle.
+  // Turning dev mode off forces the skeleton overlay off for a clean game view.
+  let devModeEnabled = false;
+  const setDevMode = (on: boolean): void => {
+    if (devModeEnabled === on) return;
+    devModeEnabled = on;
+    if (!on) setSkeleton(false);
+  };
   const onDebugKey = (e: KeyboardEvent): void => {
-    if (e.code === 'KeyO' && !e.repeat) setSkeleton(!debug.enabled);
+    // O is a dev shortcut for the skeleton — only meaningful inside dev mode.
+    if (e.code === 'KeyO' && !e.repeat && devModeEnabled) setSkeleton(!debug.enabled);
   };
   window.addEventListener('keydown', onDebugKey);
   // Emit the initial state so the HUD checkbox starts in sync.
@@ -475,9 +492,10 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       engineAudio.update(spd, lastThrottle > 0 ? lastThrottle : spd < 1 ? lastBrake : 0);
 
       if (onStats) {
-        if (mobile) {
-          // Mobile shows speed only — no dev/debug position+heading readout, so
-          // skip the per-frame yaw math and pass a shared zero (alloc-free).
+        // The position + heading readout is dev-only. On desktop it's cheap to
+        // always compute; on mobile (alloc-sensitive) we only run the yaw math
+        // while dev mode is open and otherwise pass a shared zero (alloc-free).
+        if (mobile && !devModeEnabled) {
           onStats({ speedMs: spd, fps, position: ZERO_POSITION, headingDeg: 0 });
         } else {
           const q = lerpedSnap.rotation;
@@ -511,6 +529,7 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   return {
     bus,
     setSkeleton,
+    setDevMode,
     touch: input.touch,
     pause,
     resume,

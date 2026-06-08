@@ -32,7 +32,7 @@ export function TouchControls({ session }: { session: ZoneSession | null }) {
       }}
     >
       {/* Steering — bottom-left */}
-      <div className="pointer-events-auto absolute bottom-0 left-0 flex items-end gap-3 p-4 sm:gap-4 sm:p-6">
+      <div className="pointer-events-auto absolute bottom-0 left-0 flex items-end gap-2.5 p-3 sm:gap-3 sm:p-4">
         <HoldButton
           ariaLabel="Steer left"
           onPress={() => t?.setSteer(-1)}
@@ -50,7 +50,7 @@ export function TouchControls({ session }: { session: ZoneSession | null }) {
       </div>
 
       {/* Handbrake / drift — bottom-centre, smaller and secondary */}
-      <div className="pointer-events-auto absolute bottom-0 left-1/2 flex -translate-x-1/2 items-end p-4 sm:p-6">
+      <div className="pointer-events-auto absolute bottom-0 left-1/2 flex -translate-x-1/2 items-end p-3 sm:p-4">
         <HoldButton
           ariaLabel="Handbrake"
           small
@@ -62,7 +62,7 @@ export function TouchControls({ session }: { session: ZoneSession | null }) {
       </div>
 
       {/* Pedals — bottom-right (brake left of accel, gas under the thumb) */}
-      <div className="pointer-events-auto absolute bottom-0 right-0 flex items-end gap-3 p-4 sm:gap-4 sm:p-6">
+      <div className="pointer-events-auto absolute bottom-0 right-0 flex items-end gap-2.5 p-3 sm:gap-3 sm:p-4">
         <HoldButton
           ariaLabel="Brake"
           tone="brake"
@@ -124,12 +124,12 @@ function HoldButton({
   };
 
   // Sized off the viewport's wide axis (the mobile shell locks landscape), so
-  // the pad scales from a small phone up to a tablet. Bumped well past the 44 px
-  // touch-target floor — these are the primary driving controls and must read
-  // clearly at arm's length.
+  // the pad scales from a small phone up to a tablet. Kept comfortably past the
+  // 44 px touch-target floor while staying compact so the buttons don't crowd
+  // the road.
   const size = small
-    ? 'h-[clamp(3.5rem,10vw,5rem)] w-[clamp(5.5rem,18vw,8.5rem)] rounded-2xl'
-    : 'h-[clamp(5.5rem,17vw,9rem)] w-[clamp(5.5rem,17vw,9rem)] rounded-3xl';
+    ? 'h-[clamp(3rem,8vw,4rem)] w-[clamp(4.5rem,13vw,6.5rem)] rounded-2xl'
+    : 'h-[clamp(4rem,12vw,6.5rem)] w-[clamp(4rem,12vw,6.5rem)] rounded-3xl';
 
   return (
     <button

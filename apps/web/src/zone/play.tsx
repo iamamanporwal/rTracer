@@ -7,6 +7,7 @@ import { useIsTouch } from '~/lib/use-device';
 import { startZoneSession, type SessionStats, type ZoneSession } from './session';
 import { TouchControls } from './touch-controls';
 import { PauseMenu } from './pause-menu';
+import { Speedometer } from './speedometer';
 
 /**
  * `/play/$zoneId` route — mounts the Three.js canvas and starts a zone session.
@@ -85,6 +86,7 @@ function CanvasMount(props: {
   const [weather, setWeather] = useState<string>('Clear');
   const [camera, setCamera] = useState<string>('Chase');
   const [skeleton, setSkeletonState] = useState<boolean>(false);
+  const [devMode, setDevModeState] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -129,8 +131,15 @@ function CanvasMount(props: {
 
   const toggleSkeleton = (next: boolean): void => {
     // setSkeleton goes through the session, which fires onSkeleton → React
-    // state update. Keeps O-key + checkbox in sync without optimistic updates.
+    // state update. Keeps O-key + menu toggle in sync without optimistic updates.
     sessionRef.current?.setSkeleton(next);
+  };
+
+  const toggleDevMode = (next: boolean): void => {
+    // Dev mode gates the dev telemetry. Turning it off forces the skeleton
+    // overlay off in the session (which fires onSkeleton → React state).
+    sessionRef.current?.setDevMode(next);
+    setDevModeState(next);
   };
 
   if (error) {
@@ -166,121 +175,86 @@ function CanvasMount(props: {
           </div>
         </div>
       )}
-      <Hud
-        zone={props.zone}
-        vehicle={props.vehicle}
-        stats={stats}
-        weather={weather}
-        camera={camera}
-        skeleton={skeleton}
-        onSkeletonChange={toggleSkeleton}
-        isTouch={isTouch}
-      />
-      {isTouch && !loading && (
-        <>
-          <TouchControls session={session} />
-          <PauseMenu
-            session={session}
-            cameraLabel={camera}
-            weatherLabel={weather}
-            zoneName={props.zone.name}
-            vehicleName={props.vehicle.displayName}
-          />
-        </>
+      <Hud stats={stats} devMode={devMode} isTouch={isTouch} />
+      {isTouch && !loading && <TouchControls session={session} />}
+      {!loading && (
+        <PauseMenu
+          session={session}
+          cameraLabel={camera}
+          weatherLabel={weather}
+          zoneName={props.zone.name}
+          vehicleName={props.vehicle.displayName}
+          isTouch={isTouch}
+          devMode={devMode}
+          onDevModeChange={toggleDevMode}
+          skeleton={skeleton}
+          onSkeletonChange={toggleSkeleton}
+        />
       )}
     </div>
   );
 }
 
-function Hud(props: {
-  zone: ZoneManifest;
-  vehicle: VehicleManifest;
-  stats: SessionStats;
-  weather: string;
-  camera: string;
-  skeleton: boolean;
-  onSkeletonChange: (next: boolean) => void;
-  isTouch: boolean;
-}) {
+/**
+ * In-game HUD. The player view is deliberately clean: just the analog
+ * speedometer. Developer telemetry (X/Y/Z/H + FPS) is gated behind dev mode,
+ * which the player opts into from the ESC / pause menu. Camera, weather,
+ * fullscreen and the navigation exits all live in that menu too.
+ */
+function Hud(props: { stats: SessionStats; devMode: boolean; isTouch: boolean }) {
   const kmh = props.stats.speedMs * 3.6;
-  const { x, y, z } = props.stats.position;
-
-  // On touch the top-left is the pause chip and the bottom corners are the
-  // driving pad, so the HUD collapses to a small speed readout that hugs the
-  // safe area — kept deliberately compact so it never competes with the road or
-  // the buttons. Camera / weather / FPS / position live in the pause menu
-  // instead; mobile carries no dev/debug readout at all.
-  if (props.isTouch) {
-    return (
-      <div
-        className="absolute z-30 rounded bg-black/40 px-2 py-0.5 text-right font-mono backdrop-blur"
-        style={{
-          top: 'max(env(safe-area-inset-top), 0.5rem)',
-          right: 'max(env(safe-area-inset-right), 0.5rem)',
-        }}
-      >
-        <span data-testid="hud-speed-kmh" className="text-base leading-none text-trace-fg">
-          {kmh.toFixed(0)}
-        </span>
-        <span className="ml-0.5 text-[8px] uppercase tracking-wider text-trace-muted">km/h</span>
-      </div>
-    );
-  }
 
   return (
     <>
-      <div className="absolute top-3 left-3 px-3 py-2 rounded-md bg-black/55 backdrop-blur text-xs font-mono text-trace-fg">
-        <div className="text-trace-accent">{props.zone.name}</div>
-        <div className="text-trace-muted">
-          {props.vehicle.displayName} · {props.zone.physicsProfile}
+      {/* Analog speedometer. Bottom-right on desktop (clear of everything);
+          top-right and smaller on touch (the bottom corners are the driving
+          pad, top-left is the pause chip). */}
+      {props.isTouch ? (
+        <div
+          className="absolute z-20"
+          style={{
+            top: 'max(env(safe-area-inset-top), 0.5rem)',
+            right: 'max(env(safe-area-inset-right), 0.5rem)',
+          }}
+        >
+          <Speedometer kmh={kmh} size={112} />
         </div>
-        <div className="text-trace-muted">
-          weather · {props.weather} · cam · {props.camera}
+      ) : (
+        <div className="absolute bottom-4 right-4 z-20">
+          <Speedometer kmh={kmh} size={190} />
         </div>
-      </div>
-      <div className="absolute top-3 right-3 px-3 py-2 rounded-md bg-black/55 backdrop-blur text-xs font-mono text-right">
-        <div data-testid="hud-speed-kmh" className="text-trace-fg text-2xl leading-none">
-          {kmh.toFixed(0)}
-        </div>
-        <div className="text-trace-muted uppercase tracking-wider">km/h</div>
-        <div className="text-trace-muted mt-1">{props.stats.fps.toFixed(0)} fps</div>
-        <div className="mt-2 border-t border-white/10 pt-2 text-trace-muted leading-snug">
-          <span className="text-trace-accent">X</span> {x.toFixed(1)}
-          <br />
-          <span className="text-trace-accent">Y</span> {y.toFixed(1)}
-          <br />
-          <span className="text-trace-accent">Z</span> {z.toFixed(1)}
-          <br />
-          <span className="text-trace-accent">H</span> {props.stats.headingDeg.toFixed(1)}°
-        </div>
-      </div>
-      {/* Invisible-Skeleton toggle — surfaces the physics debug overlay
-          (colliders, suspension rays, contacts, COM, velocity) that makes the
-          car's underlying tire and chassis simulation visible. The O hotkey
-          still works; this checkbox is just a discoverable alternative. */}
-      <label
-        className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-2 rounded-md bg-black/55 backdrop-blur text-xs font-mono text-trace-fg flex items-center gap-2 cursor-pointer select-none hover:text-trace-accent"
-        title="Show the physics rig — colliders, suspension rays, connection nodes (purple = body mount, orange = wheel hub), wheel contacts, COM, velocity (hotkey: O)"
-      >
-        <input
-          type="checkbox"
-          checked={props.skeleton}
-          onChange={(e) => props.onSkeletonChange(e.target.checked)}
-          className="accent-trace-accent"
-          data-testid="hud-skeleton-toggle"
-        />
-        <span>Invisible Skeleton</span>
-      </label>
-      <div className="absolute bottom-3 left-3 px-3 py-2 rounded-md bg-black/55 backdrop-blur text-[11px] font-mono text-trace-muted">
-        W/S drive · A/D steer · Space handbrake/drift · R reset · C camera (Chase ↔ Free) · Y
-        weather · O debug · Mouse look + wheel zoom (Free cam)
-      </div>
-      <Link
-        to="/"
-        className="absolute bottom-3 right-3 px-3 py-2 rounded-md bg-black/55 backdrop-blur text-xs text-trace-fg hover:text-trace-accent"
-      >
-        ← back to hub
-      </Link>
+      )}
+
+      {props.devMode && <DevReadout stats={props.stats} isTouch={props.isTouch} />}
     </>
+  );
+}
+
+/** Developer telemetry overlay — only mounted while dev mode is on. On touch it
+ * sits below the pause chip (top-left) to avoid overlapping it. */
+function DevReadout({ stats, isTouch }: { stats: SessionStats; isTouch: boolean }) {
+  const { x, y, z } = stats.position;
+  return (
+    <div
+      className="absolute z-20 px-3 py-2 rounded-md bg-black/55 backdrop-blur text-xs font-mono text-trace-fg leading-snug"
+      style={{
+        top: isTouch
+          ? 'calc(max(env(safe-area-inset-top), 0.75rem) + 4rem)'
+          : 'max(env(safe-area-inset-top), 0.75rem)',
+        left: 'max(env(safe-area-inset-left), 0.75rem)',
+      }}
+    >
+      <div className="text-trace-accent uppercase tracking-wider text-[10px] mb-1">Dev</div>
+      <div className="text-trace-muted">{stats.fps.toFixed(0)} fps</div>
+      <div className="mt-1 text-trace-muted">
+        <span className="text-trace-accent">X</span> {x.toFixed(1)}
+        <br />
+        <span className="text-trace-accent">Y</span> {y.toFixed(1)}
+        <br />
+        <span className="text-trace-accent">Z</span> {z.toFixed(1)}
+        <br />
+        <span className="text-trace-accent">H</span> {stats.headingDeg.toFixed(1)}°
+      </div>
+    </div>
   );
 }

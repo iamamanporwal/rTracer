@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import {
   Pause,
@@ -10,6 +10,8 @@ import {
   CloudSun,
   Maximize,
   Minimize,
+  Wrench,
+  Ghost,
   X,
 } from 'lucide-react';
 import {
@@ -21,11 +23,11 @@ import {
 import type { ZoneSession } from './session';
 
 /**
- * Pause / menu surface for touch play. A single pause chip sits top-left
- * (inside the safe area); tapping it freezes the session and opens a full-bleed
- * menu. The menu is the only way to reach the camera, weather, fullscreen, and
- * reset verbs that desktop drives from the keyboard, plus the requested
- * "change car / change map" exits.
+ * Pause / menu surface, shared by desktop and touch play. On touch a pause chip
+ * sits top-left (inside the safe area); on desktop the menu is opened with the
+ * ESC key. Either way it freezes the session and opens a full-bleed menu — the
+ * only way to reach camera, weather, fullscreen, reset, the dev-mode toggle, and
+ * the "change car / change map / back to hub" exits.
  *
  * Pausing routes through {@link ZoneSession.pause} (loop + audio stop); resuming
  * or dismissing the backdrop calls {@link ZoneSession.resume}. Navigating to the
@@ -38,12 +40,22 @@ export function PauseMenu({
   weatherLabel,
   zoneName,
   vehicleName,
+  isTouch,
+  devMode,
+  onDevModeChange,
+  skeleton,
+  onSkeletonChange,
 }: {
   session: ZoneSession | null;
   cameraLabel: string;
   weatherLabel: string;
   zoneName: string;
   vehicleName: string;
+  isTouch: boolean;
+  devMode: boolean;
+  onDevModeChange: (next: boolean) => void;
+  skeleton: boolean;
+  onSkeletonChange: (next: boolean) => void;
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -58,21 +70,39 @@ export function PauseMenu({
     session?.resume();
   };
 
+  // ESC toggles the menu (desktop's only entry point; harmless on touch too).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.code !== 'Escape' || e.repeat) return;
+      if (open) {
+        setOpen(false);
+        session?.resume();
+      } else {
+        session?.pause();
+        setOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, session]);
+
   return (
     <>
-      {/* Pause chip — top-left, clear of the notch. */}
-      <button
-        type="button"
-        aria-label="Pause"
-        onClick={openMenu}
-        style={{
-          top: 'max(env(safe-area-inset-top), 0.75rem)',
-          left: 'max(env(safe-area-inset-left), 0.75rem)',
-        }}
-        className="absolute z-30 grid h-[3.25rem] w-[3.25rem] touch-none place-items-center rounded-full border-2 border-white/55 bg-black/45 text-white backdrop-blur-md shadow-[0_3px_22px_rgba(0,0,0,0.6)] active:scale-95"
-      >
-        <Pause size={24} strokeWidth={2.5} />
-      </button>
+      {/* Pause chip — touch only; desktop opens the menu with ESC. */}
+      {isTouch && (
+        <button
+          type="button"
+          aria-label="Pause"
+          onClick={openMenu}
+          style={{
+            top: 'max(env(safe-area-inset-top), 0.75rem)',
+            left: 'max(env(safe-area-inset-left), 0.75rem)',
+          }}
+          className="absolute z-30 grid h-[3.25rem] w-[3.25rem] touch-none place-items-center rounded-full border-2 border-white/55 bg-black/45 text-white backdrop-blur-md shadow-[0_3px_22px_rgba(0,0,0,0.6)] active:scale-95"
+        >
+          <Pause size={24} strokeWidth={2.5} />
+        </button>
+      )}
 
       {!open ? null : (
         <div
@@ -136,6 +166,22 @@ export function PauseMenu({
                     onClick={() => void (fullscreen ? exitFullscreen() : enterFullscreen())}
                   />
                 )}
+                <Item
+                  icon={<Wrench size={18} />}
+                  label="Dev Mode"
+                  value={devMode ? 'On' : 'Off'}
+                  active={devMode}
+                  onClick={() => onDevModeChange(!devMode)}
+                />
+                {devMode && (
+                  <Item
+                    icon={<Ghost size={18} />}
+                    label="Invisible Skeleton"
+                    value={skeleton ? 'On' : 'Off'}
+                    active={skeleton}
+                    onClick={() => onSkeletonChange(!skeleton)}
+                  />
+                )}
               </div>
 
               <div className="mt-5 grid grid-cols-2 gap-2.5 border-t border-mw-edge/50 pt-5">
@@ -160,28 +206,39 @@ function Item({
   value,
   onClick,
   primary = false,
+  active = false,
 }: {
   icon: ReactNode;
   label: string;
   value?: string;
   onClick: () => void;
   primary?: boolean;
+  /** Highlight as currently-enabled (used by the toggle items). */
+  active?: boolean;
 }) {
+  const skin = primary
+    ? 'bg-mw-accent text-mw-bg'
+    : active
+      ? 'border border-mw-accent/70 bg-mw-accent/15 text-mw-text'
+      : 'border border-mw-edge/60 bg-mw-steel/40 text-mw-text hover:border-mw-accent/60';
   return (
     <button
       type="button"
       onClick={onClick}
       className={
         'flex w-full touch-none items-center gap-3 px-4 py-3 text-left font-display text-sm font-semibold uppercase tracking-[0.15em] transition-colors active:scale-[0.98] ' +
-        (primary
-          ? 'bg-mw-accent text-mw-bg'
-          : 'border border-mw-edge/60 bg-mw-steel/40 text-mw-text hover:border-mw-accent/60')
+        skin
       }
     >
       <span className={primary ? 'text-mw-bg' : 'text-mw-accent'}>{icon}</span>
       <span className="flex-1">{label}</span>
       {value && (
-        <span className="font-mono text-[11px] normal-case tracking-normal text-mw-muted">
+        <span
+          className={
+            'font-mono text-[11px] normal-case tracking-normal ' +
+            (active ? 'text-mw-accent' : 'text-mw-muted')
+          }
+        >
           {value}
         </span>
       )}
