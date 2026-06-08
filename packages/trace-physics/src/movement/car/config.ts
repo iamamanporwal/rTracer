@@ -115,47 +115,69 @@ export const DEFAULT_STEER_SPEED_SCALE = 22;
  */
 export const DEFAULT_LINEAR_DAMPING = 0.02;
 
-// ── Off-throttle behaviour: engine braking + auto-hold (creep arrest) ─────────
+// ── Off-throttle engine braking (coast-down), speed-banded ────────────────────
 /**
- * Engine-braking deceleration (m/s²) applied at the wheels when the player is
- * off both pedals — but ONLY below {@link COAST_BRAKE_FADE_END_MS}, ramping to
- * full at/under {@link COAST_BRAKE_FADE_START_MS}. So lifting off at speed lets
- * the car coast freely (realistic momentum), while under ~50 km/h it bleeds the
- * last of the speed off in a couple of seconds before the auto-hold parks it.
+ * Full engine-braking deceleration (m/s²) applied at the wheels when the player
+ * is off all pedals, in the band where it's at full strength
+ * ({@link COAST_BRAKE_TAPER_MS}..{@link COAST_BRAKE_FADE_START_MS}). Modelled on
+ * how a real car decelerates on a trailing throttle in a low gear — firm enough
+ * to bring a slow car to rest in a second or two, the band the player asked for.
  * Per-car via `manifest.tuning.engineBrakeG`.
+ *
+ * Speed profile (all overridable):
+ *   • above {@link COAST_BRAKE_FADE_END_MS} (≈50 km/h) — OFF; momentum carries.
+ *   • {@link COAST_BRAKE_FADE_START_MS}..{@link COAST_BRAKE_FADE_END_MS}
+ *       (≈25–50 km/h) — fades in linearly.
+ *   • {@link COAST_BRAKE_TAPER_MS}..{@link COAST_BRAKE_FADE_START_MS}
+ *       (≈5–25 km/h) — full strength.
+ *   • below {@link COAST_BRAKE_TAPER_MS} (≈5 km/h) — on a grade (see
+ *       {@link SLOPE_DETECT_MS2}) the brake RELEASES so gravity rolls the car
+ *       gently; on the flat it stays at full strength so the car stops dead and
+ *       holds. (Rapier's wheel model makes any low-speed brake a near-static
+ *       hold, so a slope can only roll the car if the brake is fully off there.)
  */
 export const DEFAULT_ENGINE_BRAKE_DECEL_MS2 = 3;
 /**
- * At/below this speed (m/s ≈ 50 km/h) engine braking is at full strength — this
- * is the "stops in a couple of seconds, but only when slow" band the player
- * asked for.
+ * ≈5 km/h. Below this, on a detected slope the engine brake RELEASES so gravity
+ * rolls the car gently (a real car in neutral); on the flat it keeps braking to
+ * a dead stop and holds. See {@link SLOPE_DETECT_MS2}.
  */
-export const COAST_BRAKE_FADE_START_MS = 13.89;
+export const COAST_BRAKE_TAPER_MS = 1.39;
+/** ≈25 km/h — full engine braking at/below this (down to the taper). */
+export const COAST_BRAKE_FADE_START_MS = 6.94;
+/** ≈50 km/h — engine braking OFF at/above this; fades in between the two. */
+export const COAST_BRAKE_FADE_END_MS = 13.89;
 /**
- * Above this speed (m/s ≈ 75 km/h) engine braking is OFF entirely — high-speed
- * coasting must keep rolling, not stop itself in a few seconds. Between the two
- * thresholds it fades linearly.
+ * Gravity pull along the car's forward axis (m/s²) above which it's treated as
+ * parked on a grade: under ≈5 km/h it then free-rolls (gravity carries it)
+ * instead of the brake statically holding it, until the player taps the brake.
+ * ≈0.6 m/s² ≈ a 3.5° grade — shallower "flats" still come to a firm dead stop.
+ * Derived from `gravity · chassisForward`, which a tilted road makes nonzero
+ * (the chassis pitches to match it).
  */
-export const COAST_BRAKE_FADE_END_MS = 20.83;
+export const SLOPE_DETECT_MS2 = 0.6;
+
+// ── Brake-park (hold) + reverse arming ───────────────────────────────────────
 /**
- * Auto-hold deceleration (m/s²) — a firm brake clamped onto every wheel once the
- * car has coasted to a crawl with no pedal input, so it comes to a *complete*
- * stop and stays put on a slope instead of creeping. 5 m/s² ≈ 0.5 g holds well
- * past any drivable grade. Per-car via `manifest.tuning.holdG`.
+ * Firm hold deceleration (m/s²) clamped onto every wheel once the brake-park is
+ * latched — a real parking-brake-grade hold so the car stays put on a slope.
+ * 5 m/s² ≈ 0.5 g holds well past any drivable grade. Per-car via
+ * `manifest.tuning.holdG`.
  */
 export const DEFAULT_HOLD_DECEL_MS2 = 5;
 /**
- * Engage the auto-hold below this speed (m/s). Kept under {@link
- * ABS_MIN_VEHICLE_SPEED_MS} so ABS is already disabled at the hold point and the
- * brake locks solid instead of pulsing.
+ * Speed (m/s ≈ 1.4 km/h) below which tapping the foot brake latches the park-
+ * hold. A quick tap parks the car (it then holds on a slope until you drive
+ * away); keeping the brake held instead arms reverse after the delay below.
  */
-export const HOLD_ENGAGE_MS = 0.9;
+export const PARK_BRAKE_SPEED_MS = 0.4;
 /**
- * Release the auto-hold once the car is moving faster than this (m/s) — e.g. it
- * slid off on a steep grade, or the player tapped the throttle. The engage/
- * release gap is hysteresis so the hold doesn't chatter at the threshold.
+ * How long (s) the foot brake must be held at a standstill before reverse
+ * engages. The gap is what separates a brake *tap* (→ park-hold) from a brake
+ * *hold* (→ reverse), and gives the chassis a beat to settle before backing up —
+ * the "stop, then reverse" feel of most arcade racers.
  */
-export const HOLD_RELEASE_MS = 1.4;
+export const REVERSE_ENGAGE_DELAY_S = 0.5;
 
 // ── Stability assist (anti-roll + anti-pitch-rate) ───────────────────────────
 /**
@@ -284,7 +306,7 @@ export type CarFeel = {
   linearDamping: number;
   /** Off-throttle engine-braking decel (m/s²), applied speed-gated. */
   engineBrakeDecelMs2: number;
-  /** Auto-hold decel (m/s²) that arrests creep at a standstill. */
+  /** Brake-park hold decel (m/s²) — the firm hold a brake tap latches on a slope. */
   holdDecelMs2: number;
   /** Anti-roll restoring gain (1/s², scaled by roll inertia at use). */
   antirollKp: number;

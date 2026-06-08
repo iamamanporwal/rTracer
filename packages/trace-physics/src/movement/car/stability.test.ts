@@ -120,9 +120,9 @@ describe('car stability', () => {
     expect(Number.isFinite(snap.position.x)).toBe(true);
   });
 
-  it('coasts to a complete stop and holds when the player lifts off (no idle creep)', () => {
-    // Accelerate, then release every input. Engine-braking bleeds the speed and
-    // the auto-hold clamps it to a dead stop — the "car never stops" fix.
+  it('coasts to a stop on flat ground when the player lifts off (no idle creep)', () => {
+    // Accelerate, then release every input. Speed-banded engine braking bleeds
+    // the speed and, with no slope force, the car settles to rest on the flat.
     const { snap } = run([
       { ctrl: input({ throttle: 1 }), steps: 120 },
       { ctrl: NEUTRAL_INPUT, steps: 600 },
@@ -130,9 +130,56 @@ describe('car stability', () => {
     expect(Math.abs(snap.speed)).toBeLessThan(0.1);
   });
 
+  it('rolls on a slope while coasting, and a brake tap parks it', () => {
+    // Real-car behaviour: off the pedals on a hill the car rolls (engine braking
+    // tapers to zero near standstill so it can't statically hold a grade); a quick
+    // brake tap latches the park-hold and it stays put. Simulated with tilted
+    // gravity (flat ground + a forward gravity component = a downhill).
+    const g = 9.81;
+    const theta = (12 * Math.PI) / 180; // ~12° downhill along the car's forward (−Z)
+    const physics = createPhysicsWorld({
+      gravity: { x: 0, y: -g * Math.cos(theta), z: -g * Math.sin(theta) },
+    });
+    createGround(physics.world, { tag: 'tarmac' });
+    const car = createMovement(physics.world, {
+      kind: 'car',
+      manifest: MANIFEST,
+      profile: PHYSICS_PROFILES.tarmac_circuit,
+      spawn: SPAWN,
+    });
+    for (let i = 0; i < 30; i++) {
+      car.update(NEUTRAL_INPUT, 1 / 60);
+      physics.step();
+    }
+    const zStart = car.readSnapshot().position.z;
+    // Coast on the slope: gravity should roll it downhill (+Z), not lock it up.
+    for (let i = 0; i < 240; i++) {
+      car.update(NEUTRAL_INPUT, 1 / 60);
+      physics.step();
+    }
+    const zRolled = car.readSnapshot().position.z;
+    // Tap the brake briefly (shorter than the reverse-arm delay) then release.
+    for (let i = 0; i < 20; i++) {
+      car.update(input({ brake: 1 }), 1 / 60);
+      physics.step();
+    }
+    for (let i = 0; i < 180; i++) {
+      car.update(NEUTRAL_INPUT, 1 / 60);
+      physics.step();
+    }
+    const zHeld = car.readSnapshot().position.z;
+    const heldSpeed = Math.abs(car.readSnapshot().speed);
+    car.dispose();
+    physics.dispose();
+
+    expect(Math.abs(zRolled - zStart)).toBeGreaterThan(1.0); // coasted down the grade
+    expect(Math.abs(zHeld - zRolled)).toBeLessThan(0.3); // a single brake tap parked it
+    expect(heldSpeed).toBeLessThan(0.2);
+  });
+
   it('coasts nearly freely at high speed (lifting off does not brake hard)', () => {
     // The reported bug: lifting off at speed stopped the car in ~2-3 s. Above
-    // ~75 km/h engine braking is OFF, so a second of coasting should shed only a
+    // ~50 km/h engine braking is OFF, so a second of coasting should shed only a
     // little speed (gentle drag), not a braking-grade chunk.
     const physics = createPhysicsWorld();
     createGround(physics.world, { tag: 'tarmac' });
@@ -146,7 +193,7 @@ describe('car stability', () => {
       car.update(NEUTRAL_INPUT, 1 / 60);
       physics.step();
     }
-    // Get well above the 75 km/h (20.83 m/s) free-coast threshold.
+    // Get well above the 50 km/h (13.89 m/s) free-coast threshold.
     for (let i = 0; i < 600; i++) {
       car.update(input({ throttle: 1 }), 1 / 60);
       physics.step();

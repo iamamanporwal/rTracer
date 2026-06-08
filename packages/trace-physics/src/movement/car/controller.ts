@@ -23,14 +23,16 @@ import {
   BURNOUT_MAX_SPEED_MS,
   COAST_BRAKE_FADE_END_MS,
   COAST_BRAKE_FADE_START_MS,
+  COAST_BRAKE_TAPER_MS,
   FORWARD_AXIS,
   FORWARD_SIGN,
   HANDBRAKE_SLIP_REF_SPEED_MS,
-  HOLD_ENGAGE_MS,
-  HOLD_RELEASE_MS,
   MAX_ANTIROLL_ANGLE_RAD,
   MAX_REVERSE_SPEED_MS,
+  PARK_BRAKE_SPEED_MS,
   resolveCarFeel,
+  REVERSE_ENGAGE_DELAY_S,
+  SLOPE_DETECT_MS2,
   SUSPENSION_DIR,
   UP_AXIS,
 } from './config';
@@ -81,6 +83,13 @@ export function createCarController(
   // *response*, not the same raw N·m. Floored so a degenerate manifest can't
   // zero the assist out.
   const rollInertia = Math.max(manifest.inertiaTensor[FORWARD_AXIS] ?? 0, 1);
+
+  // World gravity, cached (constant per session). Used to detect when the car is
+  // parked on a grade — `gravity · chassisForward` is the pull along the car's
+  // travel axis — so it can free-roll there instead of being brake-held.
+  const gravityX = world.gravity.x;
+  const gravityY = world.gravity.y;
+  const gravityZ = world.gravity.z;
 
   // Wheelbase (distance between front + rear axles in chassis-local Z) is
   // needed for the reverse bicycle-model yaw — see the reverse propulsion
@@ -216,6 +225,8 @@ export function createCarController(
   const worldFwd = { x: 0, y: 0, z: 0 };
   const worldUp = { x: 0, y: 0, z: 0 };
   const stabilizerOut = { x: 0, y: 0, z: 0 };
+  // Chassis forward in world, recomputed in the coast block for slope detection.
+  const coastFwd = { x: 0, y: 0, z: 0 };
 
   let initialSpawn: MovementSpawn = {
     position: [...spawn.position] as Vec3,
@@ -239,11 +250,16 @@ export function createCarController(
   // commanded velocity and a wheel-derived value — the chassis still moves at
   // the slammed speed, but the readings flicker).
   let reverseSpeed = 0;
-  // Auto-hold latch: once the car has coasted to a crawl with no pedal input we
-  // clamp a firm brake on so it stops dead and holds on a slope. Latched (with
-  // engage/release hysteresis below) so it can't brake/creep/brake oscillate at
-  // the threshold. Cleared by any pedal input or by the car sliding off.
-  let holdLatched = false;
+  // Brake-park latch: a quick tap of the foot brake at a near-standstill clamps a
+  // firm parking hold on so the car stays put even on a slope until the player
+  // drives away (throttle / handbrake / reverse release it). Off-throttle coasting
+  // does NOT auto-engage this — the speed-tapered engine braking lets a slope roll
+  // the car gently, the way a real car in neutral does, until the brake is tapped.
+  let parkHeld = false;
+  // Seconds the foot brake has been held at a standstill. Reverse only engages
+  // once this passes REVERSE_ENGAGE_DELAY_S, so a brake *tap* parks the car while
+  // a sustained *hold* backs it up — and a tap can't lurch into reverse.
+  let reverseArmTimer = 0;
 
   function update(input: ControlInput, dt: number): void {
     const ci = clampInput(input);
@@ -264,9 +280,21 @@ export function createCarController(
     // ≈ 0.4 m/s. Latching = "if we're already reversing and the player is
     // still holding S, stay in reverse" — same intent as the user's foot on
     // the pedal.
+    //
+    // Reverse ARMING: the drivetrain wants reverse the instant the brake is held
+    // at (near) standstill, but we hold it off for REVERSE_ENGAGE_DELAY_S so a
+    // brake *tap* parks the car (see parkHeld) and only a sustained *hold* backs
+    // up. Once `reverseSpeed` is rolling, the second clause keeps us latched.
+    const wantsReverse = cmd.enginePerWheel > 0;
+    if (wantsReverse && ci.brake > 0) reverseArmTimer += dt;
+    else reverseArmTimer = 0;
     const isReverseMode =
-      cmd.enginePerWheel > 0 || (ci.brake > 0 && reverseSpeed > 0);
-    const wheelEngine = isReverseMode ? 0 : cmd.enginePerWheel;
+      (wantsReverse && reverseArmTimer >= REVERSE_ENGAGE_DELAY_S) ||
+      (ci.brake > 0 && reverseSpeed > 0);
+    // Zero the wheel engine force whenever reverse is wanted (armed or not) so the
+    // car doesn't creep backward through the un-armed window — the brake/park-hold
+    // holds it there until reverse properly engages via the linvel bypass below.
+    const wheelEngine = wantsReverse ? 0 : cmd.enginePerWheel;
 
     // Burnout: both pedals mashed at a crawl. The driven wheels free-spin
     // (slip cut, brake released, full engine force) while the steered wheels
@@ -324,32 +352,52 @@ export function createCarController(
     const burnoutFrontBrake =
       (drivetrain.maxBrakeTotal * BURNOUT_FRONT_BRAKE_FRAC) / drivetrain.frontCount;
 
-    // ── Off-throttle coast-down + auto-hold (creep arrest) ─────────────────────
-    // With no pedal touched we add a brake on EVERY wheel: a gentle engine-brake
-    // while rolling so the car coasts down instead of drifting forever, and a
-    // firm latched hold once it crawls to a stop so it settles dead and stays
-    // put on a slope (the "car never stops / creeps when idle" fix). This is a
-    // controller-side brake — kept out of computeDriveCommand so the drivetrain's
-    // standstill→reverse contract is untouched. Reverse mode owns its own motion
-    // (linvel bypass), so we never fight it here.
+    // ── Brake-park hold + speed-banded engine braking (added to every wheel) ───
+    // Two off-pedal behaviours, picked here and added to the per-wheel brake
+    // below. Kept out of computeDriveCommand so the drivetrain's standstill→
+    // reverse contract is untouched. Reverse owns its own motion (linvel bypass),
+    // so neither fights it.
+    //
+    //   • PARK HOLD — a quick foot-brake tap at a near-standstill latches a firm
+    //     parking hold that survives the release, so the car stays put on a slope
+    //     until the player drives away. (A sustained hold arms reverse instead.)
+    //   • ENGINE BRAKING — when fully off the pedals, a speed-banded coast-down:
+    //     OFF above ≈50 km/h (momentum carries), fading in 25–50, full 5–25, and
+    //     TAPERING to zero under ≈5 km/h so the brake can't statically hold a
+    //     grade. Result: the car settles on flat ground but rolls gently downhill
+    //     until the brake is tapped — like a real car left in neutral.
+    // Slope detection: the gravity component along the car's forward axis. A
+    // tilted road pitches the chassis (so forward gains a vertical component) and
+    // a tilted-gravity test does the same — either way this is the pull that
+    // would roll the car along its wheels.
+    rotateByQuat(body.rotation(), 0, 0, 1, coastFwd);
+    const slopePull = Math.abs(
+      gravityX * coastFwd.x + gravityY * coastFwd.y + gravityZ * coastFwd.z,
+    );
+    const onSlope = slopePull > SLOPE_DETECT_MS2;
+
+    const nearStop = absSpeedForSlip < PARK_BRAKE_SPEED_MS;
+    if (ci.brake > 0 && nearStop && !isReverseMode) parkHeld = true;
+    if (ci.throttle > 0 || ci.handbrake > 0 || isReverseMode) parkHeld = false;
+
     const coasting =
       !isReverseMode && ci.throttle === 0 && ci.brake === 0 && ci.handbrake === 0;
-    if (coasting && absSpeedForSlip < HOLD_ENGAGE_MS) holdLatched = true;
-    if (!coasting || absSpeedForSlip > HOLD_RELEASE_MS) holdLatched = false;
     let coastBrakePerWheel = 0;
-    if (coasting) {
-      let decel: number;
-      if (holdLatched) {
-        decel = feel.holdDecelMs2;
-      } else {
-        // Engine braking only bites below ~50 km/h, fading to zero by ~75 km/h,
-        // so lifting off at speed lets the car coast on its momentum instead of
-        // braking itself to a stop in a few seconds.
-        const fadeRaw =
+    if (parkHeld) {
+      coastBrakePerWheel = (feel.holdDecelMs2 * body.mass()) / wheelCount;
+    } else if (coasting && absSpeedForSlip < COAST_BRAKE_FADE_END_MS) {
+      let decel = feel.engineBrakeDecelMs2;
+      if (absSpeedForSlip > COAST_BRAKE_FADE_START_MS) {
+        // Fade out between the full-strength speed and the off speed.
+        decel *=
           (COAST_BRAKE_FADE_END_MS - absSpeedForSlip) /
           (COAST_BRAKE_FADE_END_MS - COAST_BRAKE_FADE_START_MS);
-        const fade = fadeRaw < 0 ? 0 : fadeRaw > 1 ? 1 : fadeRaw;
-        decel = feel.engineBrakeDecelMs2 * fade;
+      } else if (onSlope && absSpeedForSlip < COAST_BRAKE_TAPER_MS) {
+        // On a grade under ≈5 km/h, release the brake so gravity rolls the car
+        // gently. (A tapered-but-nonzero brake would still statically hold it —
+        // Rapier locks a braked wheel — so it has to be fully off here.) On the
+        // flat this branch is skipped, so full braking brings it to a dead stop.
+        decel = 0;
       }
       coastBrakePerWheel = (decel * body.mass()) / wheelCount;
     }
@@ -667,7 +715,8 @@ export function createCarController(
       true,
     );
     reverseSpeed = 0;
-    holdLatched = false;
+    parkHeld = false;
+    reverseArmTimer = 0;
   }
 
   function dispose(): void {

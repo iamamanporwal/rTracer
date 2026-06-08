@@ -107,11 +107,13 @@ export function computeDriveCommand(
     const powerForce = (p.peakPowerW * input.throttle) / Math.max(absSpeed, REF_SPEED_MS);
     engineForceTotal = FORWARD_SIGN * Math.min(powerForce, p.maxEngineForce * input.throttle);
   } else if (input.brake > 0) {
-    if (signedSpeed > REVERSE_THRESHOLD_MS) {
-      // Rolling forward → footbrake.
+    if (Math.abs(signedSpeed) > REVERSE_THRESHOLD_MS) {
+      // Moving in EITHER direction → footbrake. Braking must decelerate the car,
+      // never feed reverse power into one already rolling backward (e.g. dropping
+      // back down a slope), which would speed the roll up instead of arresting it.
       footBrakeTotal = input.brake * p.maxBrakeTotal;
     } else {
-      // Stopped or already reversing. Two-stage cap: full force up to the
+      // At (near) standstill → reverse. Two-stage cap: full force up to the
       // plateau (≈80 % of top reverse speed) so the car gets a punchy launch
       // backwards, then a sharp linear ramp to zero force at MAX_REVERSE_SPEED_MS.
       // Above the cap, force is zero — friction bleeds any momentum overshoot.

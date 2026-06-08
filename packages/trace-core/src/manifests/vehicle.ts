@@ -115,7 +115,7 @@ export const VehicleManifestSchema = z.object({
       linearDamping: z.number().nonnegative().optional(),
       /** Off-throttle engine-braking (coast-down) deceleration, in g. */
       engineBrakeG: z.number().nonnegative().optional(),
-      /** Auto-hold / creep-arrest deceleration at a standstill, in g. */
+      /** Brake-park hold deceleration (firm parking hold on a slope), in g. */
       holdG: z.number().nonnegative().optional(),
       /** Anti-roll restoring gain (1/s², scaled by roll inertia at runtime). */
       antirollKp: z.number().nonnegative().optional(),
