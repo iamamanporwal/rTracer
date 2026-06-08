@@ -121,6 +121,12 @@ export const VehicleManifestSchema = z.object({
       antirollKp: z.number().nonnegative().optional(),
       /** Anti-roll/anti-pitch tilt-rate damping gain (1/s, scaled by roll inertia). */
       antirollKd: z.number().nonnegative().optional(),
+      /**
+       * Gated anti-stoppie/anti-wheelie pitch-restoring gain (1/s², scaled by
+       * pitch inertia). Engages only when one axle lifts off — keeps the rear
+       * seated under hard braking so the car skids flat instead of tipping.
+       */
+      antipitchKp: z.number().nonnegative().optional(),
       /** Front brake torque share, 0..1. */
       frontBrakeBias: z.number().min(0).max(1).optional(),
       /** Multiplier on the (mass-scaled) suspension spring stiffness. */

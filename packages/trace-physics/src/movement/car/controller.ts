@@ -14,6 +14,7 @@ import {
   ABS_LOCK_SLIP_VALUE,
   ABS_MIN_VEHICLE_SPEED_MS,
   ABS_RELEASE_RAD_S,
+  ANTIPITCH_DEADZONE_RAD,
   ANTIROLL_DEADZONE_RAD,
   AXLE_DIR,
   BURNOUT_DRIVEN_SIDE_GRIP_MUL,
@@ -82,6 +83,12 @@ export function createCarController(
   // *response*, not the same raw N·m. Floored so a degenerate manifest can't
   // zero the assist out.
   const rollInertia = Math.max(manifest.inertiaTensor[FORWARD_AXIS] ?? 0, 1);
+
+  // Pitch inertia (about the chassis-local lateral axis = X) — scales the
+  // anti-stoppie restoring torque so the *response* is mass-agnostic, same as
+  // rollInertia does for anti-roll. Floored so a degenerate manifest can't zero
+  // the guard out.
+  const pitchInertia = Math.max(manifest.inertiaTensor[0] ?? 0, 1);
 
   // World gravity, cached (constant per session). Used to detect when the car is
   // parked on a grade — `gravity · chassisForward` is the pull along the car's
@@ -223,6 +230,8 @@ export function createCarController(
   const localUp = { x: 0, y: 0, z: 0 };
   const worldFwd = { x: 0, y: 0, z: 0 };
   const worldUp = { x: 0, y: 0, z: 0 };
+  // Chassis lateral (X) axis in world — the axis the anti-stoppie torque pitches about.
+  const worldRight = { x: 0, y: 0, z: 0 };
   const stabilizerOut = { x: 0, y: 0, z: 0 };
   // Chassis forward in world, recomputed in the coast block for slope detection.
   const coastFwd = { x: 0, y: 0, z: 0 };
@@ -398,6 +407,12 @@ export function createCarController(
       coastBrakePerWheel = (decel * body.mass()) / wheelCount;
     }
 
+    // Axle ground contact — feeds the gated anti-stoppie guard below. If exactly
+    // one axle is airborne (front XOR rear) the chassis is pitching off its
+    // wheels (stoppie/wheelie); with both or neither grounded the guard stays off.
+    let frontGrounded = false;
+    let rearGrounded = false;
+
     for (let i = 0; i < wheelCount; i++) {
       const w = chassis.wheels[i];
       if (!w) continue;
@@ -430,6 +445,10 @@ export function createCarController(
         footBrake = w.isSteered ? cmd.frontBrake : cmd.rearBrake;
       }
       const isContact = controller.wheelIsInContact(i);
+      if (isContact) {
+        if (w.isSteered) frontGrounded = true;
+        else rearGrounded = true;
+      }
 
       if (carMoving && isContact) {
         if (wheelLocked[i]) {
@@ -451,7 +470,13 @@ export function createCarController(
       // double up; at the hold speed ABS is already off so it locks solid.
       const brake =
         (w.isSteered ? modulatedFoot : modulatedFoot + cmd.rearHandbrake) + coastBrakePerWheel;
-      controller.setWheelBrake(i, brake);
+      // Rapier consumes the brake value as an IMPULSE (N·s), not a force — unlike
+      // setWheelEngineForce, which it multiplies by dt internally. Our brake
+      // budgets are all forces (mass × decel), so multiply by dt here to turn the
+      // force into the per-step impulse Rapier expects. Without this every brake
+      // (foot, hand, hold, engine) is 1/dt ≈ 60× too strong, which both stopped
+      // the car in a fraction of a second and pole-vaulted it into a stoppie.
+      controller.setWheelBrake(i, brake * dt);
 
       controller.setWheelSteering(i, w.isSteered ? cmd.steerAngle : 0);
       // Handbrake breaks rear grip for drifts; fronts keep biting. Burnout
@@ -517,6 +542,29 @@ export function createCarController(
       rotateByQuat(q, 0, 0, 1, worldFwd);
       rotateByQuat(q, 0, 1, 0, worldUp);
 
+      // ── Anti-stoppie / anti-wheelie (gated pitch restore) ──
+      // Pitch = world-up tipped about the lateral axis: nose-down drops localUp
+      // toward the car's forward axis. The guard is GATED on exactly one axle
+      // being airborne (front XOR rear) so it fires only on a genuine stoppie /
+      // wheelie — never on a slope or in cornering, where all four wheels touch
+      // down. Past a small deadzone it pulls the lifted axle back to the ground
+      // with a torque about the chassis lateral (X) axis, scaled by pitch inertia
+      // so kp reads as an acceleration. So the car skids flat under hard braking.
+      let restorePitch = 0;
+      if (frontGrounded !== rearGrounded && feel.antipitchKp > 0) {
+        let pitch = Math.atan2(localUp.z, localUp.y);
+        if (pitch > MAX_ANTIROLL_ANGLE_RAD) pitch = MAX_ANTIROLL_ANGLE_RAD;
+        else if (pitch < -MAX_ANTIROLL_ANGLE_RAD) pitch = -MAX_ANTIROLL_ANGLE_RAD;
+        const activePitch =
+          pitch > ANTIPITCH_DEADZONE_RAD
+            ? pitch - ANTIPITCH_DEADZONE_RAD
+            : pitch < -ANTIPITCH_DEADZONE_RAD
+              ? pitch + ANTIPITCH_DEADZONE_RAD
+              : 0;
+        restorePitch = pitchInertia * feel.antipitchKp * activePitch;
+      }
+      rotateByQuat(q, 1, 0, 0, worldRight);
+
       // Tilt rate = angular velocity with its yaw component (about the car's own
       // up) removed, so we damp roll AND pitch but never the player's steering.
       const av = body.angvel();
@@ -532,9 +580,9 @@ export function createCarController(
       // unbounded torque when called every tick — applyTorqueImpulse is one-shot.
       const restore = -rollInertia * feel.antirollKp * activeRoll;
       const kd = rollInertia * feel.antirollKd;
-      stabilizerOut.x = (worldFwd.x * restore - kd * tiltX) * dt;
-      stabilizerOut.y = (worldFwd.y * restore - kd * tiltY) * dt;
-      stabilizerOut.z = (worldFwd.z * restore - kd * tiltZ) * dt;
+      stabilizerOut.x = (worldFwd.x * restore + worldRight.x * restorePitch - kd * tiltX) * dt;
+      stabilizerOut.y = (worldFwd.y * restore + worldRight.y * restorePitch - kd * tiltY) * dt;
+      stabilizerOut.z = (worldFwd.z * restore + worldRight.z * restorePitch - kd * tiltZ) * dt;
       body.applyTorqueImpulse(stabilizerOut, true);
     }
 

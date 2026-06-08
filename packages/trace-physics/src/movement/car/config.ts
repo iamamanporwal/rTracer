@@ -63,12 +63,14 @@ export const DEFAULT_DRIVE_ACCEL_MS2 = 5.5;
  * The foot brake (S) uses it at full strength across all four wheels; the
  * handbrake (Space) multiplies it by {@link DEFAULT_HANDBRAKE_FORCE_MUL} on the
  * locked rear so Space is the stronger reference and S lands at ≈1/mul of it
- * (the "S = ~65 % of Space" request). 9 m/s² ≈ 0.92 g — a firm, planted stop;
- * the brake input ramp (`input.ts`) plus the anti-pitch rate damping in the
- * stabilizer keep this from pitching the chassis into a stoppie. Sport cars
- * override via `manifest.tuning.brakeDecelG`.
+ * (the "S = ~65 % of Space" request). 6 m/s² ≈ 0.61 g — a firm but unhurried
+ * street stop that takes 2+ s from normal speeds (a real car only nears 1 g in a
+ * genuine emergency); the brake input ramp (`input.ts`), the anti-pitch *rate*
+ * damping, and the gated anti-stoppie restoring ({@link DEFAULT_ANTIPITCH_KP})
+ * keep this from lifting the rear. Sport cars override via
+ * `manifest.tuning.brakeDecelG`.
  */
-export const DEFAULT_PEAK_DECEL_MS2 = 9;
+export const DEFAULT_PEAK_DECEL_MS2 = 6;
 /**
  * Handbrake (Space) force as a multiple of the foot-brake budget. >1 makes the
  * handbrake the firmer brake, so the foot brake (S) is ≈1/mul = 67 % of it —
@@ -162,10 +164,11 @@ export const SLOPE_DETECT_MS2 = 0.6;
 /**
  * Firm hold deceleration (m/s²) clamped onto every wheel once the brake-park is
  * latched — a real parking-brake-grade hold so the car stays put on a slope.
- * 5 m/s² ≈ 0.5 g holds well past any drivable grade. Per-car via
+ * 8 m/s² ≈ 0.8 g holds well past any drivable grade AND promptly arrests the
+ * gentle downhill roll that precedes a brake-tap park. Per-car via
  * `manifest.tuning.holdG`.
  */
-export const DEFAULT_HOLD_DECEL_MS2 = 5;
+export const DEFAULT_HOLD_DECEL_MS2 = 8;
 /**
  * Speed (m/s ≈ 1.4 km/h) below which tapping the foot brake latches the park-
  * hold. A quick tap parks the car (it then holds on a slope until you drive
@@ -198,6 +201,20 @@ export const DEFAULT_ANTIROLL_KP = 50;
 export const DEFAULT_ANTIROLL_KD = 14;
 /** Roll inside this angle (rad) is left untouched — natural cornering lean. */
 export const ANTIROLL_DEADZONE_RAD = 3.5 * DEG;
+/**
+ * Anti-stoppie / anti-wheelie restoring gain (1/s² — a restoring angular
+ * acceleration per rad of body PITCH, scaled by pitch inertia so it's
+ * mass-agnostic). Unlike anti-roll this is *gated*: it engages ONLY when one
+ * axle has lifted off the ground while the other stays planted — the exact
+ * signature of a stoppie (rear up under braking) or a wheelie (front up under
+ * launch). Because it never fires while all four wheels touch down, it leaves
+ * slope pitch and normal brake dive/squat completely alone. Per-car via
+ * `manifest.tuning.antipitchKp`. Firm by design — the rear must come straight
+ * back down so the car skids flat instead of tipping forward.
+ */
+export const DEFAULT_ANTIPITCH_KP = 120;
+/** Pitch inside this angle (rad) is left untouched — natural brake dive / squat. */
+export const ANTIPITCH_DEADZONE_RAD = 5 * DEG;
 /** Clamp the roll fed to the restoring term (rad) so a flipped car can't blow up. */
 export const MAX_ANTIROLL_ANGLE_RAD = Math.PI / 4;
 /** Fraction of chassis half-height the COM sits below center at comHeightScale=1. */
@@ -313,6 +330,8 @@ export type CarFeel = {
   antirollKp: number;
   /** Anti-roll/anti-pitch tilt-rate damping gain (1/s, scaled by roll inertia). */
   antirollKd: number;
+  /** Gated anti-stoppie/anti-wheelie pitch-restoring gain (1/s², scaled by pitch inertia). */
+  antipitchKp: number;
   comHeightScale: number;
   suspensionStiffnessScale: number;
   suspensionTravelScale: number;
@@ -338,6 +357,7 @@ export function resolveCarFeel(manifest: VehicleManifest): CarFeel {
     holdDecelMs2: t?.holdG != null ? t.holdG * G : DEFAULT_HOLD_DECEL_MS2,
     antirollKp: t?.antirollKp ?? DEFAULT_ANTIROLL_KP,
     antirollKd: t?.antirollKd ?? DEFAULT_ANTIROLL_KD,
+    antipitchKp: t?.antipitchKp ?? DEFAULT_ANTIPITCH_KP,
     comHeightScale: t?.comHeightScale ?? 1,
     suspensionStiffnessScale: t?.suspensionStiffnessScale ?? 1,
     suspensionTravelScale: t?.suspensionTravelScale ?? 1,
