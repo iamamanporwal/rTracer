@@ -676,11 +676,36 @@ export function createCarController(
           const fwd = lv.x * worldFwd.x + lv.y * worldFwd.y + lv.z * worldFwd.z;
           if (ny < Math.cos(LOOP_ASSIST_MIN_SURF_TILT_RAD) && Math.abs(fwd) > LOOP_ASSIST_MIN_SPEED_MS) {
             loopMode = true;
-            // (1) Align chassis up onto the surface normal. Error axis = up × n is
-            // the rotation that brings them together (mostly the loop's pitch).
-            const ex = worldUp.y * nz - worldUp.z * ny;
-            const ey = worldUp.z * nx - worldUp.x * nz;
-            const ez = worldUp.x * ny - worldUp.y * nx;
+            // (1) Align the chassis up to the loop's local "up" (toward centre).
+            // We DON'T align straight to the averaged contact normal: a long
+            // vehicle bridges the arc, so that average under-tilts and the chassis
+            // under-rotates (climbs without going over). Instead take the part of
+            // the normal perpendicular to travel — the velocity is the true loop
+            // tangent regardless of bridging, so its perpendicular (on the normal's
+            // side) is the true "up", and any vehicle length rotates correctly.
+            let ux = nx;
+            let uy = ny;
+            let uz = nz;
+            const sp = Math.hypot(lv.x, lv.y, lv.z);
+            if (sp > 1e-3) {
+              const vx = lv.x / sp;
+              const vy = lv.y / sp;
+              const vz = lv.z / sp;
+              const ndv = nx * vx + ny * vy + nz * vz;
+              const px = nx - ndv * vx;
+              const py = ny - ndv * vy;
+              const pz = nz - ndv * vz;
+              const pl = Math.hypot(px, py, pz);
+              if (pl > 1e-3) {
+                ux = px / pl;
+                uy = py / pl;
+                uz = pz / pl;
+              }
+            }
+            // Error axis = up × u is the rotation bringing them together (the loop's pitch).
+            const ex = worldUp.y * uz - worldUp.z * uy;
+            const ey = worldUp.z * ux - worldUp.x * uz;
+            const ez = worldUp.x * uy - worldUp.y * ux;
             const kp = rollInertia * LOOP_ASSIST_ALIGN_KP;
             const kdA = rollInertia * LOOP_ASSIST_ALIGN_KD;
             stabilizerOut.x = (kp * ex - kdA * tiltX) * dt;
