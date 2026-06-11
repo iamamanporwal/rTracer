@@ -113,6 +113,7 @@ describe('resolveCarFeel tuning overrides (per-car tweakability)', () => {
         handbrakeForceMul: 2.2,
         maxReverseSpeedMul: 0.5,
         linearDamping: 0.04,
+        angularDamping: 1.8,
         engineBrakeG: 0.2,
         holdG: 0.6,
         antirollKp: 80,
@@ -123,6 +124,7 @@ describe('resolveCarFeel tuning overrides (per-car tweakability)', () => {
     expect(feel.handbrakeForceMul).toBe(2.2);
     expect(feel.maxReverseSpeedMul).toBe(0.5);
     expect(feel.linearDamping).toBe(0.04);
+    expect(feel.angularDamping).toBe(1.8);
     expect(feel.engineBrakeDecelMs2).toBeCloseTo(0.2 * G, 5);
     expect(feel.holdDecelMs2).toBeCloseTo(0.6 * G, 5);
     expect(feel.antirollKp).toBe(80);

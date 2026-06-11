@@ -32,6 +32,12 @@ const ZOOM_MAX = 2.4;
 export type CameraInputDriver = {
   /** Advance recenter smoothing by `dt` and return the latest camera control. Allocates nothing. */
   sample(dt: number): CameraControl;
+  /**
+   * Enable / disable the driver. While disabled, every listener early-returns
+   * and any active pointer lock is released — the replay player calls this so
+   * its free camera owns the canvas without the live orbit fighting it.
+   */
+  setEnabled(on: boolean): void;
   dispose(): void;
 };
 
@@ -39,14 +45,17 @@ export function createCameraInput(canvas: HTMLCanvasElement): CameraInputDriver 
   const control: CameraControl = { yaw: 0, pitch: 0.12, distance: 1 };
   let locked = false;
   let dragging = false;
+  let enabled = true;
 
   function onMouseMove(e: MouseEvent): void {
+    if (!enabled) return;
     if (!locked && !dragging) return;
     control.yaw -= e.movementX * YAW_SENS;
     control.pitch = clamp(control.pitch + e.movementY * PITCH_SENS, PITCH_MIN, PITCH_MAX);
   }
 
   function onMouseDown(): void {
+    if (!enabled) return;
     dragging = true;
     // Try pointer lock for free-look; harmless if it's rejected. Newer DOM
     // typings return a Promise, so discard it with `void`.
@@ -57,6 +66,7 @@ export function createCameraInput(canvas: HTMLCanvasElement): CameraInputDriver 
   }
 
   function onWheel(e: WheelEvent): void {
+    if (!enabled) return;
     e.preventDefault();
     const dir = e.deltaY > 0 ? 1 : -1;
     control.distance = clamp(control.distance + dir * ZOOM_STEP, ZOOM_MIN, ZOOM_MAX);
@@ -80,6 +90,7 @@ export function createCameraInput(canvas: HTMLCanvasElement): CameraInputDriver 
   }
 
   function onTouchStart(e: TouchEvent): void {
+    if (!enabled) return;
     if (e.touches.length === 1) {
       const t = e.touches[0];
       if (!t) return;
@@ -93,6 +104,7 @@ export function createCameraInput(canvas: HTMLCanvasElement): CameraInputDriver 
   }
 
   function onTouchMove(e: TouchEvent): void {
+    if (!enabled) return;
     if (e.touches.length === 1) {
       const t = e.touches[0];
       if (!t) return;
@@ -134,6 +146,13 @@ export function createCameraInput(canvas: HTMLCanvasElement): CameraInputDriver 
       // Sticky orbit — the camera holds wherever the player last left it. No
       // idle decay back behind the car (that was fighting the player's aim).
       return control;
+    },
+    setEnabled(on) {
+      enabled = on;
+      if (!on) {
+        dragging = false;
+        if (document.pointerLockElement === canvas) document.exitPointerLock();
+      }
     },
     dispose() {
       canvas.removeEventListener('mousedown', onMouseDown);

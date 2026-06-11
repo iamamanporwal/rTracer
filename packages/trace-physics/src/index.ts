@@ -12,6 +12,7 @@ export * from './world';
 export * from './ground';
 export * from './zone-collider';
 export * from './obstacles';
+export * from './stunts';
 export * from './input';
 export * from './movement';
 export * from './vehicle';

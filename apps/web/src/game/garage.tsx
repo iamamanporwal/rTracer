@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { ChevronLeft, ChevronRight, Car, Truck, Loader2, TriangleAlert } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Car, Truck, Bike, Loader2, TriangleAlert } from 'lucide-react';
 import { vehicleBundleDir, type VehicleManifest } from '@trace/core';
 import { useStore } from '~/store';
 import { loadVehicleIndex, loadVehicleManifest, useAsync } from '~/manifests';
@@ -292,7 +292,7 @@ function HeroArt({
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = previewUrl && !imgFailed;
-  const Glyph = classLabel === 'All-terrain' ? Truck : Car;
+  const Glyph = classLabel === 'Bike' ? Bike : classLabel === 'All-terrain' ? Truck : Car;
 
   return (
     <div className="mw-fade pointer-events-none absolute inset-0">
@@ -377,7 +377,7 @@ type Spec = {
   powerHp: number;
   topKmh: number;
   drivetrain: 'AWD' | 'RWD' | 'FWD';
-  classLabel: 'Sports' | 'Muscle' | 'All-terrain' | 'Demo';
+  classLabel: 'Sports' | 'Muscle' | 'All-terrain' | 'Demo' | 'Bike';
   gearLabel: string;
   redline: number;
   meters: { power: number; top: number; grip: number; agility: number };
@@ -413,13 +413,15 @@ function deriveSpec(m: VehicleManifest): Spec {
   };
 
   const classLabel: Spec['classLabel'] =
-    drivetrain === 'AWD' && m.mass > 2500
-      ? 'All-terrain'
-      : powerToWeight >= 250
-        ? 'Sports'
-        : m.mass > 1600
-          ? 'Muscle'
-          : 'Demo';
+    m.class === 'bike'
+      ? 'Bike'
+      : drivetrain === 'AWD' && m.mass > 2500
+        ? 'All-terrain'
+        : powerToWeight >= 250
+          ? 'Sports'
+          : m.mass > 1600
+            ? 'Muscle'
+            : 'Demo';
 
   const gearLabel =
     m.gearbox.type === 'automatic' && m.gearbox.ratios.length <= 1

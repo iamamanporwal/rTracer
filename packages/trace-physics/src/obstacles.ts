@@ -36,15 +36,20 @@ type Entry = {
   snapshot: ObstacleSnapshot;
 };
 
+// Side bay (metres). The crate/bump test cluster lives off to the left so the
+// centre is a clear runway for the stunt-park jump lane (x≈0) and the loop lane
+// (x≈+24) sits clear to the right.
+const BAY_X = -20;
+
 export function createObstacleField(world: RAPIER.World): ObstacleField {
   const entries: Entry[] = [];
 
-  // Speed bump — static, low-and-wide cuboid spanning the path ahead.
+  // Speed bump — static, low-and-wide cuboid in the side bay.
   entries.push(
     spawnStaticBox(world, {
       id: 'bump_main',
       kind: 'speedBump',
-      position: { x: 0, y: 0.09, z: -10 },
+      position: { x: BAY_X, y: 0.09, z: -10 },
       halfExtents: { x: 4, y: 0.09, z: 0.35 },
       friction: 0.9,
     }),
@@ -57,12 +62,12 @@ export function createObstacleField(world: RAPIER.World): ObstacleField {
   // force). A row of three, a stack of two behind, and a lone one off to the
   // side close enough to clip on the way out of the spawn.
   const cratePositions: { x: number; y: number; z: number }[] = [
-    { x: -1.5, y: 0.5, z: -18 },
-    { x: 0, y: 0.5, z: -18 },
-    { x: 1.5, y: 0.5, z: -18 },
-    { x: 0, y: 0.5, z: -22 },
-    { x: 0, y: 1.5, z: -22 },
-    { x: -5, y: 0.5, z: -14 },
+    { x: BAY_X - 1.5, y: 0.5, z: -18 },
+    { x: BAY_X, y: 0.5, z: -18 },
+    { x: BAY_X + 1.5, y: 0.5, z: -18 },
+    { x: BAY_X, y: 0.5, z: -22 },
+    { x: BAY_X, y: 1.5, z: -22 },
+    { x: BAY_X - 5, y: 0.5, z: -14 },
   ];
   for (let i = 0; i < cratePositions.length; i++) {
     const p = cratePositions[i];

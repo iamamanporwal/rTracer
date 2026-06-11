@@ -29,6 +29,8 @@ import { createTireMaterial } from './materials';
 export type VehicleVisualSnapshot = {
   position: { x: number; y: number; z: number };
   rotation: { x: number; y: number; z: number; w: number };
+  /** Signed forward speed (m/s). Used by the bike visual to derive cosmetic lean. */
+  speed?: number;
   wheels: {
     position: { x: number; y: number; z: number };
     steering: number;
@@ -42,6 +44,17 @@ export type VehicleVisual = {
   group: THREE.Group;
   /** Update transforms from a physics snapshot. Allocates nothing. */
   applySnapshot(snapshot: VehicleVisualSnapshot): void;
+  /**
+   * Optional per-frame tick for time-based visuals (e.g. the bike rider's
+   * crash-fall AnimationMixer). `dt` is the render frame delta in seconds. Cars
+   * leave this undefined; the session calls it only when present.
+   */
+  update?(dt: number): void;
+  /**
+   * Optional one-shot crash trigger — bikes play the rider's falling animation.
+   * Called by the session on a hard chassis impact. No-op / undefined otherwise.
+   */
+  crash?(): void;
   dispose(): void;
 };
 

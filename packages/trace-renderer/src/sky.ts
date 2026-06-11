@@ -1,60 +1,71 @@
 import * as THREE from 'three';
 
 /**
- * Anime-stylized sky — bright saturated gradient + soft puffy clouds.
+ * Dramatic stylized sky dome — a rich vertical gradient with a real sun (disc +
+ * atmospheric halo) and a night star field. One draw call, a handful of cheap
+ * fragment ops, ~640 verts — basically free on mobile.
  *
- * Implemented as a large inverted icosahedron rendered with a custom shader.
- * One draw call, two texture lookups per fragment, ~640 verts — basically free
- * even on mobile. Tone-mapping and fog are disabled on the sky material so the
- * saturated palette survives ACES (clouds stay punchy in golden hour, not
- * washed out into beige). Render order is forced to `-1` so the dome paints
- * behind everything.
+ * Clouds used to be painted here by spherically projecting a blob texture and
+ * thresholding it; that sliced clouds along the horizon and pinched them at the
+ * zenith (the "cut" bug). Clouds now live in {@link createCloudField} as real
+ * billboards, so this dome owns only the sky itself: gradient, sun, stars.
  *
- * Clouds are a procedurally-generated `CanvasTexture` of soft white blobs,
- * sampled twice at different scales with opposite scroll directions — gives
- * believable parallax for free. Cloud color/coverage are uniforms so the
- * weather system can tint them gray for rain or golden for sunset live.
+ * Tone-mapping and fog are disabled on the dome so the saturated palette and the
+ * sun bloom survive ACES (golden hour stays punchy, not washed to beige). Render
+ * order is forced to `-1` so the dome paints behind everything, and it doesn't
+ * write depth — so the cloud billboards (and the world) composite over it.
  */
 
-// Radius is well within the chase camera's far plane (2000m) so frustum
-// clipping never eats the dome. Since `setCameraAnchor` re-centers it on the
-// camera every frame, any "infinite sky" feel is preserved regardless of where
-// the car drives.
+// Radius is well within the chase camera's far plane (2000m) so frustum clipping
+// never eats the dome. `setCameraAnchor` re-centres it on the camera each frame,
+// so the "infinite sky" feel holds wherever the car drives.
 const SKY_RADIUS = 1200;
 const SKY_DETAIL = 3;
 
 export type SkyTint = {
+  /** Top of the dome. */
   zenith: THREE.ColorRepresentation;
+  /** Mid band — the second gradient stop above the horizon. */
+  mid: THREE.ColorRepresentation;
+  /** Horizon band. */
   horizon: THREE.ColorRepresentation;
-  cloud: THREE.ColorRepresentation;
-  /** 0..1 — fraction of the sky covered by clouds. */
-  coverage: number;
+  /** Sun disc + core colour. */
+  sunColor: THREE.ColorRepresentation;
+  /** Broad atmospheric halo colour around the sun. */
+  sunGlow: THREE.ColorRepresentation;
+  /** 0..~1.5 — intensity of the halo. 0 hides the sun glow (overcast/storm). */
+  sunGlowStrength: number;
+  /** Direction toward the sun; normalized in-shader. Match the directional light. */
+  sunDir: [number, number, number];
+  /** 0..1 — night star field intensity. 0 on daytime presets. */
+  starStrength: number;
 };
 
 export type SkyHandle = {
   /** Root mesh (added to the scene by this factory). */
   readonly mesh: THREE.Mesh;
-  /** Tween the sky/cloud colors to a new tint. */
+  /** Retarget the sky palette + sun + stars. */
   setTint(tint: SkyTint): void;
   /**
-   * Re-center the dome on the camera each frame so an "infinite sky" reads
+   * Re-centre the dome on the camera each frame so an "infinite sky" reads
    * without clipping at the camera's far plane no matter where the car drives.
    */
   setCameraAnchor(x: number, y: number, z: number): void;
-  /** Advance the cloud-drift time. `dt` in seconds. */
+  /** Advance time (drives the subtle star twinkle). `dt` in seconds. */
   update(dt: number): void;
   dispose(): void;
 };
 
 export function createAnimeSky(scene: THREE.Scene): SkyHandle {
-  const cloudTex = createCloudTexture();
-
   const uniforms: Record<string, THREE.IUniform> = {
-    uZenith: { value: new THREE.Color('#5fb6ff') },
-    uHorizon: { value: new THREE.Color('#cfeeff') },
-    uCloudColor: { value: new THREE.Color('#ffffff') },
-    uCloudCoverage: { value: 0.35 },
-    uCloudTex: { value: cloudTex },
+    uZenith: { value: new THREE.Color('#1e7fff') },
+    uMid: { value: new THREE.Color('#5aa6ff') },
+    uHorizon: { value: new THREE.Color('#bfe4ff') },
+    uSunColor: { value: new THREE.Color('#fff4d6') },
+    uSunGlow: { value: new THREE.Color('#ffe9b0') },
+    uSunGlowStrength: { value: 0.5 },
+    uSunDir: { value: new THREE.Vector3(-0.6, 1, 0.4).normalize() },
+    uStarStrength: { value: 0 },
     uTime: { value: 0 },
   };
 
@@ -71,7 +82,7 @@ export function createAnimeSky(scene: THREE.Scene): SkyHandle {
 
   const geometry = new THREE.IcosahedronGeometry(SKY_RADIUS, SKY_DETAIL);
   const mesh = new THREE.Mesh(geometry, material);
-  mesh.name = 'anime-sky';
+  mesh.name = 'sky-dome';
   mesh.frustumCulled = false;
   mesh.renderOrder = -1;
   scene.add(mesh);
@@ -80,9 +91,15 @@ export function createAnimeSky(scene: THREE.Scene): SkyHandle {
     mesh,
     setTint(tint) {
       (uniforms.uZenith!.value as THREE.Color).set(tint.zenith);
+      (uniforms.uMid!.value as THREE.Color).set(tint.mid);
       (uniforms.uHorizon!.value as THREE.Color).set(tint.horizon);
-      (uniforms.uCloudColor!.value as THREE.Color).set(tint.cloud);
-      uniforms.uCloudCoverage!.value = clamp01(tint.coverage);
+      (uniforms.uSunColor!.value as THREE.Color).set(tint.sunColor);
+      (uniforms.uSunGlow!.value as THREE.Color).set(tint.sunGlow);
+      uniforms.uSunGlowStrength!.value = Math.max(0, tint.sunGlowStrength);
+      (uniforms.uSunDir!.value as THREE.Vector3)
+        .set(tint.sunDir[0], tint.sunDir[1], tint.sunDir[2])
+        .normalize();
+      uniforms.uStarStrength!.value = clamp01(tint.starStrength);
     },
     setCameraAnchor(x, y, z) {
       mesh.position.set(x, y, z);
@@ -94,7 +111,6 @@ export function createAnimeSky(scene: THREE.Scene): SkyHandle {
       mesh.removeFromParent();
       geometry.dispose();
       material.dispose();
-      cloudTex.dispose();
     },
   };
 }
@@ -104,7 +120,7 @@ export function createAnimeSky(scene: THREE.Scene): SkyHandle {
 const VERT = /* glsl */ `
   varying vec3 vDir;
   void main() {
-    // Sky direction = normalized object-space position (dome is centered at origin).
+    // Sky direction = normalized object-space position (dome centred at origin).
     vDir = normalize(position);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
@@ -113,117 +129,54 @@ const VERT = /* glsl */ `
 const FRAG = /* glsl */ `
   precision mediump float;
   uniform vec3 uZenith;
+  uniform vec3 uMid;
   uniform vec3 uHorizon;
-  uniform vec3 uCloudColor;
-  uniform float uCloudCoverage;
+  uniform vec3 uSunColor;
+  uniform vec3 uSunGlow;
+  uniform float uSunGlowStrength;
+  uniform vec3 uSunDir;
+  uniform float uStarStrength;
   uniform float uTime;
-  uniform sampler2D uCloudTex;
   varying vec3 vDir;
+
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
 
   void main() {
     vec3 dir = normalize(vDir);
     float up = clamp(dir.y, 0.0, 1.0);
 
-    // Vertical sky gradient — smoothstep ramps fast so the saturated zenith
-    // dominates most of the visible sky (chase cams mostly see the lower half).
-    vec3 sky = mix(uHorizon, uZenith, smoothstep(0.0, 0.32, up));
+    // Three-stop vertical gradient: horizon → mid → zenith. Two smoothsteps give
+    // a luminous band above the horizon that a single ramp can't — the look that
+    // sells golden hour and clear-blue depth at chase-cam framing.
+    vec3 sky = mix(uHorizon, uMid, smoothstep(0.0, 0.18, up));
+    sky = mix(sky, uZenith, smoothstep(0.15, 0.62, up));
 
-    // Spherical projection for cloud UVs.
-    float az = atan(dir.z, dir.x) * 0.15915494; // / (2π)
-    vec2 uv = vec2(az + 0.5, up);
+    // Sun: a tight bright disc plus a broad halo. The halo rides the gradient
+    // additively (so it survives the no-tonemap path) and is biased toward the
+    // horizon for that golden-hour bloom. uSunGlowStrength 0 → no sun at all.
+    vec3 sd = normalize(uSunDir);
+    float sun = max(dot(dir, sd), 0.0);
+    float disc = pow(sun, 900.0);
+    float halo = pow(sun, 6.0);
+    float horizonBias = 1.0 - smoothstep(0.0, 0.5, up);
+    sky += uSunGlow * (halo * uSunGlowStrength) * (0.55 + 0.45 * horizonBias);
+    sky += uSunColor * disc * 1.6;
 
-    // Two scrolling layers at different scales → cheap parallax. R channel only.
-    float c1 = texture2D(uCloudTex, uv * vec2(2.2, 1.0) + vec2(uTime * 0.003, 0.0)).r;
-    float c2 = texture2D(uCloudTex, uv * vec2(3.6, 1.6) + vec2(uTime * -0.005, 0.07)).r;
-    float clouds = max(c1, c2 * 0.85);
+    // Stars (night only): a fixed pattern quantized on the view sphere so there's
+    // no pole pinch or horizon blow-up, masked to the upper sky, slowly twinkling.
+    if (uStarStrength > 0.001) {
+      vec3 q = floor(dir * 140.0);
+      float s = hash(q.xy + vec2(q.z * 13.1, q.z * 7.7));
+      float star = step(0.984, s) * smoothstep(0.02, 0.22, up);
+      float tw = 0.55 + 0.45 * sin(uTime * 2.0 + s * 100.0);
+      sky += vec3(star * tw * uStarStrength) * vec3(0.9, 0.95, 1.0);
+    }
 
-    // Coverage maps to threshold (low coverage = high threshold = few clouds).
-    // Tuned so the default coverage produces a clearly visible scattered field.
-    float thresh = mix(0.62, 0.12, clamp(uCloudCoverage, 0.0, 1.0));
-    // Tight band → crisp anime cloud edges (soft, not foggy).
-    float mask = smoothstep(thresh, thresh + 0.08, clouds);
-
-    // Subtle taper at the very bottom — keep clouds visible at chase-cam look
-    // angles (the camera mostly sees the lower hemisphere of the sky).
-    mask *= smoothstep(-0.02, 0.06, up);
-
-    vec3 col = mix(sky, uCloudColor, mask);
-    gl_FragColor = vec4(col, 1.0);
+    gl_FragColor = vec4(sky, 1.0);
   }
 `;
-
-// ── Cloud texture (procedural, generated once at init) ─────────────────────
-
-/**
- * Generate a 256×128 soft-blob cloud texture: black background with overlapping
- * Gaussian splats. Sampled twice at different scales by the sky shader for a
- * parallaxed anime-cloud look. Texture is RGBA but only the R channel is read.
- */
-function createCloudTexture(): THREE.Texture {
-  if (typeof document === 'undefined') {
-    // Headless / SSR — return a 1×1 transparent texture as a harmless fallback.
-    const data = new Uint8Array([0, 0, 0, 0]);
-    const tex = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat);
-    tex.needsUpdate = true;
-    return tex;
-  }
-  const w = 256;
-  const h = 128;
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    const data = new Uint8Array([0, 0, 0, 0]);
-    return new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat);
-  }
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, w, h);
-  ctx.globalCompositeOperation = 'lighter';
-
-  // Sparse soft blobs — the texture must be MOSTLY dark with rare bright peaks,
-  // because the sky shader treats "bright pixel" as "this is a cloud". 50 blobs
-  // at radius up to 52 px overlapped so heavily that the texture was nearly
-  // saturated, which flipped the look: sky reads as overcast white with rare
-  // dark holes (the inverse of an anime "clear sky with a few puffs"). 16 small
-  // blobs gives a histogram with a clear dark majority + isolated bright peaks.
-  const blobs = 16;
-  for (let i = 0; i < blobs; i++) {
-    const x = Math.random() * w;
-    const y = 0.18 * h + Math.pow(Math.random(), 1.3) * h * 0.82;
-    const r = 10 + Math.random() * 18;
-    const alpha = 0.35 + Math.random() * 0.45;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, `rgba(255,255,255,${alpha})`);
-    g.addColorStop(0.55, `rgba(255,255,255,${alpha * 0.35})`);
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-    // Mirror near the seam so wrapping doesn't show a hard edge at azimuth 0.
-    if (x < r) {
-      ctx.beginPath();
-      ctx.arc(x + w, y, r, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (x > w - r) {
-      ctx.beginPath();
-      ctx.arc(x - w, y, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.minFilter = THREE.LinearMipMapLinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-  tex.colorSpace = THREE.NoColorSpace; // we read it as a luminance mask, not a color
-  tex.anisotropy = 1; // mobile-cheap
-  tex.generateMipmaps = true;
-  tex.needsUpdate = true;
-  return tex;
-}
 
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;

@@ -16,6 +16,12 @@ export type ControlInput = {
   brake: number;
   steering: number;
   handbrake: number;
+  /**
+   * Rider weight-shift, -1..1 (GTA bike control). +1 = lean BACK (↓ arrow) which,
+   * with throttle, pops a wheelie; -1 = lean FORWARD (↑ arrow) which, with the
+   * brake, does a stoppie. Ignored by cars. 0 = upright.
+   */
+  pitchLean: number;
   reset: boolean;
 };
 
@@ -24,6 +30,7 @@ export const NEUTRAL_INPUT: ControlInput = Object.freeze({
   brake: 0,
   steering: 0,
   handbrake: 0,
+  pitchLean: 0,
   reset: false,
 });
 
@@ -34,6 +41,7 @@ export function clampInput(input: ControlInput): ControlInput {
     brake: clamp01(input.brake),
     steering: clampSigned(input.steering),
     handbrake: clamp01(input.handbrake),
+    pitchLean: clampSigned(input.pitchLean),
     reset: input.reset,
   };
 }

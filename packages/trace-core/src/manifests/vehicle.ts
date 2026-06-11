@@ -13,6 +13,16 @@ export const VehicleManifestSchema = z.object({
   displayName: z.string().min(1).max(80),
   version: z.string().regex(/^\d+\.\d+\.\d+$/, 'version must be semver MAJOR.MINOR.PATCH'),
 
+  /**
+   * Vehicle kind. `bike` flips the renderer to the two-wheeled visual path
+   * (static body + cosmetic lean + a posed rider, see `createBikeVisual`) and
+   * the UI to a motorcycle label/icon. Absent → `car` (every existing manifest).
+   * NOTE: a bike's *physics* rig is still a stable narrow four-wheel raycast
+   * vehicle — the two visible wheels are cosmetic. This keeps the tuned
+   * never-flip car dynamics; only the look changes.
+   */
+  class: z.enum(['car', 'bike']).optional(),
+
   visualMesh: z.string(),
   proxyMesh: z.string(),
   skinning: z.string(),
@@ -32,7 +42,7 @@ export const VehicleManifestSchema = z.object({
           isSteered: z.boolean(),
         }),
       )
-      .length(4, 'exactly four wheels required'),
+      .min(2, 'at least two wheels required'),
     seat: Vec3Schema,
   }),
 
@@ -83,6 +93,44 @@ export const VehicleManifestSchema = z.object({
           rr: z.array(z.string()).min(1),
         })
         .optional(),
+      /**
+       * Bike steering binding (class `bike` only). The GLB carries a `steer` node
+       * whose origin is baked on the steering-head pivot, parenting `wheel_front`
+       * + `grips`. The renderer turns that node about `axis` (a unit vector in the
+       * model's body frame — the raked steering axis: roughly straight up, tilted
+       * back by the rake angle) by the front wheel's steer angle, clamped to
+       * ±`maxDeg`. Absent → the front wheel turns about pure vertical at its hub.
+       */
+      steer: z
+        .object({
+          /** Steering-axis unit vector in model/glTF body coords (x, up, fwd). */
+          axis: Vec3Schema,
+          /** Visual steering clamp at the front wheel, in degrees. */
+          maxDeg: z.number().positive(),
+        })
+        .optional(),
+    })
+    .optional(),
+
+  /**
+   * Optional rider — a rigged humanoid (Mixamo `mixamorig:` skeleton) seated on
+   * a bike. Loaded as FBX at runtime by `createBikeVisual`, posed into a riding
+   * position via bone rotations, and parented to the bike's visual group so it
+   * leans with the body. On a hard crash it plays `fallClip` (a Mixamo
+   * falling/knockout clip) if provided. Ignored unless `class === 'bike'`.
+   */
+  rider: z
+    .object({
+      /** FBX path relative to the bundle dir, e.g. `rider/x_bot.fbx`. */
+      fbx: z.string(),
+      /** Optional Mixamo falling/knockout clip (FBX) played on a hard crash. */
+      fallClip: z.string().optional(),
+      /** Uniform scale (model units → meters). Mixamo exports are cm → ~0.01. */
+      scale: z.number().positive().optional(),
+      /** Seat-local placement nudge (meters) for fine alignment on the seat. */
+      offset: Vec3Schema.optional(),
+      /** Crash-impact magnitude (N·s) above which the fall animation triggers. */
+      crashImpulse: z.number().positive().optional(),
     })
     .optional(),
 
@@ -113,6 +161,12 @@ export const VehicleManifestSchema = z.object({
       steerSpeedScale: z.number().positive().optional(),
       /** Chassis linear damping (coasting drag); lower = freer high-speed coast. */
       linearDamping: z.number().nonnegative().optional(),
+      /**
+       * Chassis angular damping (yaw/roll/pitch rate drag). Higher = more planted,
+       * resists oversteer (the rear can't snap around); lower = looser, slides more
+       * freely. The main lever for how much the car wants to rotate.
+       */
+      angularDamping: z.number().nonnegative().optional(),
       /** Off-throttle engine-braking (coast-down) deceleration, in g. */
       engineBrakeG: z.number().nonnegative().optional(),
       /** Brake-park hold deceleration (firm parking hold on a slope), in g. */
@@ -169,6 +223,7 @@ export const VehicleManifestSchema = z.object({
 export type VehicleManifest = z.infer<typeof VehicleManifestSchema>;
 export type GearboxType = VehicleManifest['gearbox']['type'];
 export type VehicleVisualConfig = NonNullable<VehicleManifest['visual']>;
+export type VehicleRiderConfig = NonNullable<VehicleManifest['rider']>;
 export type VehicleTuning = NonNullable<VehicleManifest['tuning']>;
 export type VehicleAudioProfile = NonNullable<VehicleManifest['audio']>;
 

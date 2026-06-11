@@ -11,12 +11,14 @@ import {
   createGround,
   createObstacleField,
   createPhysicsWorld,
+  createStuntPark,
   createVehicle,
   createZoneCollider,
   raycastGroundY,
   initRapier,
   PHYSICS_PROFILES,
   type ObstacleField,
+  type StuntPark,
   type PhysicsWorld,
   type VehicleHandle,
   type VehicleSnapshot,
@@ -25,12 +27,14 @@ import {
   CAMERA_MODES,
   createBodyDeformer,
   createCameraRig,
+  createBikeVisual,
   createEngineAudio,
   createEnvironmentMap,
   createGlbVehicleVisual,
   createGlbZoneVisual,
   createGroundVisual,
   createObstacleVisuals,
+  createStuntVisuals,
   createPhysicsDebug,
   createRenderer,
   createScene,
@@ -44,6 +48,7 @@ import {
   type EnvironmentMap,
   type GroundVisual,
   type ObstacleVisuals,
+  type StuntVisuals,
   type PhysicsDebug,
   type SceneBundle,
   type BodyDeformer,
@@ -53,9 +58,19 @@ import {
   type WeatherSystem,
   type ZoneVisual,
 } from '@trace/renderer';
-import { createKeyboardInput, type InputDriver, type TouchControls } from './input';
+import { createKeyboardInput, type InputActive, type InputDriver, type TouchControls } from './input';
 import { createCameraInput, type CameraInputDriver } from './camera-input';
 import { createLoop, type Loop } from './loop';
+import { createTelemetryRecorder, type TelemetryMeta, type TelemetrySummary } from './telemetry';
+import {
+  createReplayCamera,
+  createReplayPlayer,
+  type ReplayCamera,
+  type ReplayPlayer,
+  type ReplayState,
+} from './replay';
+
+export type { ReplayState } from './replay';
 
 /**
  * Zone session — one canvas-bound runtime instance per `/play/$zoneId` mount.
@@ -72,11 +87,19 @@ export type SessionStats = {
   position: { x: number; y: number; z: number };
   /** Yaw heading in degrees — 0° = +Z, clockwise positive. Use this to set spawn rotation. */
   headingDeg: number;
+  /** Live raw control-button state — drives the dev-mode input logger. */
+  input: InputActive;
+  /** Telemetry recorder status — drives the dev-mode record/download panel. */
+  telemetry: TelemetrySummary;
 };
 
 /** Shared zero position handed to `onStats` on mobile, where the dev/debug
  * position+heading readout isn't shown — avoids a per-frame allocation. */
 const ZERO_POSITION = { x: 0, y: 0, z: 0 };
+
+/** Shared idle telemetry summary for the alloc-sensitive mobile path (the dev
+ * telemetry panel is hidden there, so the value is never read). */
+const IDLE_TELEMETRY: TelemetrySummary = { recording: false, frameCount: 0, hitCount: 0, durationS: 0 };
 
 /** Metres above the raycast-found surface to seat a car in a GLB world — the
  * chassis-centre height. Matches zone_alpha's flat-ground spawn (0.5): low
@@ -108,6 +131,31 @@ export type SessionInit = {
    * desktop default (`false`) is pixel-for-pixel unchanged.
    */
   mobile?: boolean;
+};
+
+/**
+ * Transport handle for the dev 3D replay, returned by {@link
+ * ZoneSession.enterReplay}. Mirrors a video player: play / pause / reverse /
+ * restart / scrub / speed, plus a follow toggle for the bird's-eye camera.
+ * {@link exit} returns to live play.
+ */
+export type ReplayHandle = {
+  /** Play forward (rewinds first if parked at the end). */
+  play(): void;
+  pause(): void;
+  /** Pause ⇄ play forward. */
+  toggle(): void;
+  /** Play backward (jumps to the end first if parked at the start). */
+  reverse(): void;
+  /** Restart from the beginning and play forward. */
+  restart(): void;
+  setSpeed(mult: number): void;
+  /** Scrub to a normalized [0, 1] position. */
+  seekFrac(frac: number): void;
+  /** Lock the camera onto the car (true) or free it to fly around (false). */
+  setFollow(on: boolean): void;
+  /** Leave replay and resume live play. */
+  exit(): void;
 };
 
 export type ZoneSession = {
@@ -143,6 +191,25 @@ export type ZoneSession = {
   cycleCamera(): void;
   /** Advance to the next weather preset. Mirrors the Y key. */
   cycleWeather(): void;
+  /**
+   * Begin a fresh telemetry capture (dev mode). Discards any previous capture;
+   * step indices and time restart at 0 from this call. The fixed loop then
+   * records one row per physics step plus any chassis contact impacts until
+   * {@link stopTelemetry}. Live status surfaces through {@link SessionStats.telemetry}.
+   */
+  startTelemetry(): void;
+  /** Stop the active telemetry capture. Recorded data stays available for {@link telemetryCsv}. */
+  stopTelemetry(): void;
+  /** Serialize the most recent capture to a CSV string (metadata header + one row per step). */
+  telemetryCsv(): string;
+  /**
+   * Enter the dev 3D replay player for the most recent telemetry capture.
+   * Freezes the live sim, hands the canvas to a free bird's-eye camera, and
+   * poses the vehicle from the recorded frames. `onProgress` fires every frame
+   * with the transport state (drives the scrubber). Returns a {@link
+   * ReplayHandle}, or `null` if nothing has been recorded yet.
+   */
+  enterReplay(onProgress: (state: ReplayState) => void): ReplayHandle | null;
   dispose(): void;
 };
 
@@ -184,6 +251,8 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   let groundVisual: GroundVisual | null = null;
   let obstacles: ObstacleField | null = null;
   let obstacleVisuals: ObstacleVisuals | null = null;
+  let stunts: StuntPark | null = null;
+  let stuntVisuals: StuntVisuals | null = null;
 
   if (zoneManifest.world) {
     const url = `${zoneBundleDir(zoneManifest.id, zoneManifest.version)}/${zoneManifest.world.glb}`;
@@ -208,6 +277,12 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
     // meshes; `obstacleVisuals.update` syncs the dynamic crates each render frame.
     obstacleVisuals = createObstacleVisuals(obstacles.readSnapshot());
     sceneBundle.scene.add(obstacleVisuals.group);
+    // Stunt park — kick ramps, a long-jump gap, and a 360° loop the bike must
+    // hit at speed to clear. All static, so the visuals are built once and never
+    // touched per frame.
+    stunts = createStuntPark(physics.world);
+    stuntVisuals = createStuntVisuals(stunts.readSnapshot());
+    sceneBundle.scene.add(stuntVisuals.group);
   }
 
   // Vehicle. Spawn XZ + facing come from the manifest. For a GLB world the
@@ -243,10 +318,22 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   // Vehicle visual: a rigged GLB when the manifest declares one, else the
   // procedural demo body. Both honour the same applySnapshot contract.
   let vehicleVisual: VehicleVisual;
-  if (vehicleManifest.visual?.format === 'glb' && vehicleManifest.visual.glb) {
-    const url = `${vehicleBundleDir(vehicleManifest.id, vehicleManifest.version)}/${vehicleManifest.visual.glb}`;
+  const bundleDir = vehicleBundleDir(vehicleManifest.id, vehicleManifest.version);
+  if (vehicleManifest.class === 'bike' && vehicleManifest.visual?.glb) {
+    // Two-wheeled path: static GLB body + cosmetic lean + posed rider. The
+    // physics is still the stable narrow four-wheel rig from the manifest.
+    const rider = vehicleManifest.rider;
+    vehicleVisual = await createBikeVisual({
+      url: `${bundleDir}/${vehicleManifest.visual.glb}`,
+      manifest: vehicleManifest,
+      restHubLocalY: vehicle.restHubLocalY,
+      environment: environment.texture,
+      riderUrl: rider ? `${bundleDir}/${rider.fbx}` : null,
+      fallClipUrl: rider?.fallClip ? `${bundleDir}/${rider.fallClip}` : null,
+    });
+  } else if (vehicleManifest.visual?.format === 'glb' && vehicleManifest.visual.glb) {
     vehicleVisual = await createGlbVehicleVisual({
-      url,
+      url: `${bundleDir}/${vehicleManifest.visual.glb}`,
       manifest: vehicleManifest,
       restHubLocalY: vehicle.restHubLocalY,
       environment: environment.texture,
@@ -255,6 +342,10 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
     vehicleVisual = createVehicleVisual({ manifest: vehicleManifest, liveryColor });
   }
   sceneBundle.scene.add(vehicleVisual.group);
+
+  // Chassis-impact magnitude (N·s) that throws the bike rider. Infinity for cars
+  // and bikes without a rider, so the crash trigger is a no-op for them.
+  const crashImpulse = vehicleManifest.rider?.crashImpulse ?? Infinity;
 
   // Body deformation — crumples the car's body mesh on hard contacts. Driven by
   // contact-force impacts harvested from Rapier each step (see `physics.step` /
@@ -267,8 +358,37 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   // per-wheel `slip`/`contact` from the physics snapshot each render frame,
   // so handbrake yanks, burnouts, and ABS-locked panic stops all draw through
   // the same seam without the renderer knowing why a tire is sliding.
-  const tireFx: TireFx = createTireFx({ wheelCount: vehicle.wheelCount });
+  // A bike's physics rig is a narrow FOUR-wheel rig, but it has only two visible
+  // tyres. Skid marks must read as ONE rear tyre, not the two rig wheels (±0.3 m
+  // apart), so for bikes we collapse the rig's L/R pairs onto the centreline and
+  // feed the FX two merged wheels (front + rear) instead of four.
+  const isBikeRig = vehicleManifest.class === 'bike' && vehicle.wheelCount === 4;
+  const tireFx: TireFx = createTireFx({ wheelCount: isBikeRig ? 2 : vehicle.wheelCount });
   sceneBundle.scene.add(tireFx.group);
+  // Alloc-free scratch for the bike skid-frame merge (front + rear centreline).
+  type SlipFrameIn = { contact: { x: number; y: number; z: number }; slip: number; inContact: boolean };
+  const bikeSlipFrames: SlipFrameIn[] | null = isBikeRig
+    ? [
+        { contact: { x: 0, y: 0, z: 0 }, slip: 0, inContact: false },
+        { contact: { x: 0, y: 0, z: 0 }, slip: 0, inContact: false },
+      ]
+    : null;
+  /** Collapse the rig's L/R wheel pairs to two centreline frames (front, rear). */
+  function bikeTireFrames(wheels: readonly SlipFrameIn[]): SlipFrameIn[] | null {
+    if (!bikeSlipFrames) return null;
+    for (let p = 0; p < 2; p++) {
+      const a = wheels[p * 2];
+      const b = wheels[p * 2 + 1];
+      const f = bikeSlipFrames[p]!;
+      if (!a || !b) continue;
+      f.contact.x = (a.contact.x + b.contact.x) * 0.5;
+      f.contact.y = (a.contact.y + b.contact.y) * 0.5;
+      f.contact.z = (a.contact.z + b.contact.z) * 0.5;
+      f.slip = Math.max(a.slip, b.slip);
+      f.inContact = a.inContact || b.inContact;
+    }
+    return bikeSlipFrames;
+  }
 
   // Physics debug overlay — the "invisible skeleton" that makes the tire and
   // chassis physics visible (colliders, suspension rays, wheel contacts, COM,
@@ -364,6 +484,45 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   const input: InputDriver = createKeyboardInput();
   const cameraInput: CameraInputDriver = createCameraInput(canvas);
 
+  // Dev-mode race telemetry. Records per-step pose + the exact control input fed
+  // to the controller, plus chassis contact impacts — opt-in via the dev panel,
+  // so the default hot path is untouched (every record call is a no-op while not
+  // recording). `meta` captures the resolved spawn (post-raycast for GLB worlds)
+  // so a future replay can seat the car before feeding the recorded inputs.
+  const telemetryMeta: TelemetryMeta = {
+    zoneId: zoneManifest.id,
+    zoneVersion: zoneManifest.version,
+    vehicleId: vehicleManifest.id,
+    vehicleVersion: vehicleManifest.version,
+    spawn: { position: spawn.position, rotation: spawn.rotation },
+  };
+  const telemetry = createTelemetryRecorder(telemetryMeta);
+  // Monotonic fixed-step counter for the whole session. Recorded rows use the
+  // offset from the step recording began on, so each capture starts at step 0.
+  let simStep = 0;
+  let recordBaseStep = 0;
+  const startTelemetry = (): void => {
+    recordBaseStep = simStep;
+    telemetry.start();
+  };
+
+  // ── Replay (dev 3D video player) ──────────────────────────────────────────
+  // Pressing Play on a finished capture freezes the live sim and switches the
+  // render loop into a scrubbable 3D player: the vehicle visual is posed from
+  // the recorded frames and a free orbit/pan camera flies around the scene.
+  // Physics never steps in replay, so the live car stays put and snaps back on
+  // exit. Both instances are null in 'live' mode.
+  type RunMode = 'live' | 'replay';
+  let mode: RunMode = 'live';
+  let replayPlayer: ReplayPlayer | null = null;
+  let replayCamera: ReplayCamera | null = null;
+  let onReplayProgress: ((state: ReplayState) => void) | null = null;
+  const emitReplay = (): void => {
+    if (replayPlayer && replayCamera) {
+      onReplayProgress?.({ ...replayPlayer.state, following: replayCamera.following });
+    }
+  };
+
   // Canvas sizing. `clientWidth/Height` can be 0 mid-mount, so prefer the parent then the window.
   const resize = (): void => {
     const cw = canvas.clientWidth;
@@ -403,6 +562,10 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
 
   const loop: Loop = createLoop({
     step(dt) {
+      // Replay freezes the live sim — the render branch poses the scene from
+      // recorded frames instead, so physics/input/camera never advance here.
+      if (mode === 'replay') return;
+
       // The pose at the end of the previous step becomes "prev" for the next
       // render interpolation. Then run physics, then capture the new "curr".
       copySnapshot(currSnap, prevSnap);
@@ -418,6 +581,19 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       physics.step();
 
       copySnapshot(vehicle.readSnapshot(), currSnap);
+
+      // Telemetry: capture the post-step pose + the control input that produced
+      // it. No-op (and no heading math) unless a capture is running.
+      if (telemetry.recording) {
+        telemetry.recordStep(
+          simStep - recordBaseStep,
+          currSnap,
+          ctrl,
+          input.active,
+          headingDegFromQuat(currSnap.rotation),
+        );
+      }
+      simStep++;
 
       // Advance the camera spring at the same fixed step the physics runs at,
       // chasing the authoritative (discrete) pose. The rig stores prev/curr
@@ -441,6 +617,24 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       const instantaneous = elapsed > 0 ? 1 / elapsed : fps;
       fps = fps * 0.92 + instantaneous * 0.08;
 
+      // Replay: pose the car from the recorded frames + drive the free camera,
+      // then bail before any of the live (physics-coupled) render passes.
+      if (mode === 'replay' && replayPlayer && replayCamera) {
+        const snap = replayPlayer.advance(elapsed);
+        vehicleVisual.applySnapshot(snap);
+        vehicleVisual.update?.(elapsed); // bike rider idle mixer; no-op for cars
+        if (replayCamera.following) {
+          const fp = replayPlayer.focusPosition;
+          replayCamera.setFocus(fp.x, fp.y, fp.z);
+        }
+        replayCamera.update(rig.camera);
+        // Keep the sky/rain alive for ambience; tire FX + physics stay frozen.
+        weather.update(elapsed, rig.camera.position);
+        renderer.render(sceneBundle.scene, rig.camera);
+        emitReplay();
+        return;
+      }
+
       // Interpolated camera pose for this frame (lockstep with the car visual
       // below). Applied first so `rig.camera.position` is current for the
       // distance-culling reads in the tire FX and weather passes.
@@ -453,14 +647,25 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       // and camera move every frame instead of ticking at 60 Hz.
       lerpSnapshot(prevSnap, currSnap, alpha, lerpedSnap, prevQuat, currQuat);
       vehicleVisual.applySnapshot(lerpedSnap);
+      // Advance any time-based visual (the bike rider's crash-fall mixer). No-op
+      // for cars, which don't implement `update`.
+      vehicleVisual.update?.(elapsed);
 
       // Crumple the body for any chassis impacts harvested since the last frame.
       // We always drain (even with no deformer) so the impact buffer can't grow.
       physics.drainImpacts((impact) => {
-        if (!deformer) return;
-        if (impact.bodyA === chassisBodyHandle || impact.bodyB === chassisBodyHandle) {
-          deformer.applyImpact(impact.point, impact.magnitude);
+        const isChassis =
+          impact.bodyA === chassisBodyHandle || impact.bodyB === chassisBodyHandle;
+        if (!isChassis) return;
+        // Telemetry: log where the car got hit and how hard (the strongest hit
+        // per step wins). No-op unless a capture is running.
+        if (telemetry.recording) {
+          telemetry.recordImpact(simStep - recordBaseStep, impact.point, impact.magnitude);
         }
+        deformer?.applyImpact(impact.point, impact.magnitude);
+        // Bikes: a hard enough chassis hit throws the rider (plays the fall clip
+        // if one was supplied). `crashImpulse` is Infinity for cars, so no-op.
+        if (impact.magnitude >= crashImpulse) vehicleVisual.crash?.();
       });
 
       // Tire-ground FX. Feed the lerped wheel snapshots directly — they
@@ -469,7 +674,10 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       // with the body axis through drifts (instead of zig-zagging on noisy
       // motion-vector deltas). Camera position is used to cull smoke spawns
       // at long range.
-      tireFx.update(lerpedSnap.wheels, elapsed, rig.camera.position, lerpedSnap.rotation);
+      // Bikes: feed two centreline frames so the rear lays a single skid mark,
+      // not the two from the hidden four-wheel rig. Cars feed all four directly.
+      const fxWheels = bikeSlipFrames ? bikeTireFrames(lerpedSnap.wheels)! : lerpedSnap.wheels;
+      tireFx.update(fxWheels, elapsed, rig.camera.position, lerpedSnap.rotation);
 
       // Sync the dynamic crates to whatever Rapier produced this step. The
       // speed bump is static so its entries no-op, but the read is cheap. Only
@@ -496,11 +704,16 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
         // always compute; on mobile (alloc-sensitive) we only run the yaw math
         // while dev mode is open and otherwise pass a shared zero (alloc-free).
         if (mobile && !devModeEnabled) {
-          onStats({ speedMs: spd, fps, position: ZERO_POSITION, headingDeg: 0 });
+          onStats({ speedMs: spd, fps, position: ZERO_POSITION, headingDeg: 0, input: input.active, telemetry: IDLE_TELEMETRY });
         } else {
-          const q = lerpedSnap.rotation;
-          const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
-          onStats({ speedMs: spd, fps, position: lerpedSnap.position, headingDeg: (yaw * 180) / Math.PI });
+          onStats({
+            speedMs: spd,
+            fps,
+            position: lerpedSnap.position,
+            headingDeg: headingDegFromQuat(lerpedSnap.rotation),
+            input: input.active,
+            telemetry: telemetry.summary(),
+          });
         }
       }
     },
@@ -526,6 +739,76 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
     deformer?.reset();
   };
 
+  const exitReplay = (): void => {
+    if (mode !== 'replay') return;
+    mode = 'live';
+    replayCamera?.dispose();
+    replayCamera = null;
+    replayPlayer = null;
+    onReplayProgress = null;
+    cameraInput.setEnabled(true);
+    // Resume the engine note unless the pause menu is holding the loop frozen.
+    if (!paused) engineAudio.resume();
+  };
+
+  const enterReplay = (onProgress: (state: ReplayState) => void): ReplayHandle | null => {
+    if (mode === 'replay') return null;
+    const capture = telemetry.getReplay();
+    if (!capture) return null;
+
+    // Freeze live play: silence the engine and hand the canvas to the free
+    // replay camera (the live orbit input bows out and releases pointer lock).
+    engineAudio.suspend();
+    cameraInput.setEnabled(false);
+
+    const player = createReplayPlayer(capture);
+    const cam = createReplayCamera(canvas);
+    const f0 = capture.frames[0]!;
+    cam.setFocus(f0.position.x, f0.position.y, f0.position.z);
+
+    replayPlayer = player;
+    replayCamera = cam;
+    onReplayProgress = onProgress;
+    mode = 'replay';
+    emitReplay(); // push the initial state so the overlay shows immediately
+
+    return {
+      play: () => {
+        player.play();
+        emitReplay();
+      },
+      pause: () => {
+        player.pause();
+        emitReplay();
+      },
+      toggle: () => {
+        player.toggle();
+        emitReplay();
+      },
+      reverse: () => {
+        player.reverse();
+        emitReplay();
+      },
+      restart: () => {
+        player.restart();
+        emitReplay();
+      },
+      setSpeed: (m) => {
+        player.setSpeed(m);
+        emitReplay();
+      },
+      seekFrac: (frac) => {
+        player.seekFrac(frac);
+        emitReplay();
+      },
+      setFollow: (on) => {
+        cam.following = on;
+        emitReplay();
+      },
+      exit: () => exitReplay(),
+    };
+  };
+
   return {
     bus,
     setSkeleton,
@@ -539,6 +822,10 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
     resetVehicle,
     cycleCamera: () => setCameraMode(cameraModeIndex + 1),
     cycleWeather: () => setWeather(weatherIndex + 1),
+    startTelemetry,
+    stopTelemetry: () => telemetry.stop(),
+    telemetryCsv: () => telemetry.buildCsv(),
+    enterReplay,
     dispose() {
       loop.stop();
       resizeObserver.disconnect();
@@ -552,11 +839,14 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       engineAudio.dispose();
       input.dispose();
       cameraInput.dispose();
+      replayCamera?.dispose();
       tireFx.dispose();
       deformer?.dispose();
       vehicleVisual.dispose();
       obstacleVisuals?.dispose();
       obstacles?.dispose();
+      stuntVisuals?.dispose();
+      stunts?.dispose();
       groundVisual?.dispose();
       zoneVisual?.dispose();
       disposeSurfaceMaterials(materials);
@@ -569,6 +859,12 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       bus.clear();
     },
   };
+}
+
+/** Yaw heading of a quaternion in degrees — 0° = +Z, clockwise positive. */
+function headingDegFromQuat(q: { x: number; y: number; z: number; w: number }): number {
+  const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
+  return (yaw * 180) / Math.PI;
 }
 
 function pickSpawn(zone: ZoneManifest): { position: [number, number, number]; rotation: [number, number, number, number] } {

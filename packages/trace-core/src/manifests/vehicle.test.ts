@@ -54,10 +54,12 @@ describe('VehicleManifestSchema', () => {
     expect(() => VehicleManifestSchema.parse(bad)).toThrow(/vehicle_/);
   });
 
-  it('rejects rigs with the wrong wheel count', () => {
+  it('rejects rigs with fewer than two wheels', () => {
+    // The rig requires `.min(2)` (a bike's physics rig is a narrow 4-wheel one,
+    // but the schema allows 2+ so future rigs aren't locked to exactly four).
     const bad = {
       ...valid,
-      rig: { ...valid.rig, wheels: valid.rig.wheels.slice(0, 3) },
+      rig: { ...valid.rig, wheels: valid.rig.wheels.slice(0, 1) },
     };
     expect(() => VehicleManifestSchema.parse(bad)).toThrow();
   });

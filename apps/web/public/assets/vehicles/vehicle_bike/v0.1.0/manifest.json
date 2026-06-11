@@ -1,0 +1,75 @@
+{
+  "id": "vehicle_bike",
+  "displayName": "Honda NR750",
+  "version": "0.1.0",
+  "class": "bike",
+  "visualMesh": "model/scene.glb",
+  "proxyMesh": "model/scene.glb",
+  "skinning": "",
+  "rig": {
+    "wheels": [
+      { "position": [0.3, 0.31, 0.7], "radius": 0.31, "isDriven": false, "isSteered": true },
+      { "position": [-0.3, 0.31, 0.7], "radius": 0.31, "isDriven": false, "isSteered": true },
+      { "position": [0.3, 0.31, -0.7], "radius": 0.31, "isDriven": true, "isSteered": false },
+      { "position": [-0.3, 0.31, -0.7], "radius": 0.31, "isDriven": true, "isSteered": false }
+    ],
+    "seat": [0, 1.05, -0.1]
+  },
+  "mass": 300,
+  "inertiaTensor": [70, 90, 45],
+  "engine": {
+    "powerCurveHpAtRpm": [
+      [0, 25],
+      [5000, 70],
+      [10000, 115],
+      [14000, 125],
+      [15000, 110]
+    ],
+    "redline": 14000
+  },
+  "gearbox": {
+    "ratios": [2.6, 1.9, 1.5, 1.3, 1.15, 1.04],
+    "final": 2.9,
+    "type": "manual"
+  },
+  "visual": {
+    "format": "glb",
+    "glb": "model/scene.glb",
+    "scale": 1.0,
+    "yaw": 0,
+    "offset": [0, 0, 0],
+    "steer": {
+      "axis": [0, 0.9135, -0.4067],
+      "maxDeg": 26
+    }
+  },
+  "rider": {
+    "fbx": "rider/x_bot.fbx",
+    "scale": 0.01,
+    "offset": [0, -0.86, -0.12],
+    "crashImpulse": 4000
+  },
+  "tuning": {
+    "driveAccelG": 0.75,
+    "brakeDecelG": 1.0,
+    "reverseAccelG": 0.3,
+    "maxReverseSpeedMul": 0.3,
+    "maxSteerDeg": 34,
+    "steerSpeedScale": 18,
+    "frontBrakeBias": 0.7,
+    "gripScale": 1.15,
+    "comHeightScale": 1.3,
+    "antirollKp": 90,
+    "antirollKd": 18,
+    "suspensionStiffnessScale": 1.3,
+    "suspensionTravelScale": 0.9,
+    "rideHeight": 0.3
+  },
+  "audio": {
+    "kind": "inline",
+    "idleHz": 90,
+    "revHz": 1400,
+    "gain": 0.4
+  },
+  "credits": "Bike: \"Honda NR750 1994\" by Comrade1280 (https://sketchfab.com/3d-models/honda-nr750-1994-89a79e0a3c334b23830561961f9644c8) licensed CC-BY-4.0. Rider: Adobe Mixamo \"X Bot\"."
+}

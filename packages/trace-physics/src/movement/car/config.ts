@@ -97,14 +97,30 @@ export const MAX_REVERSE_SPEED_MS = 13.89;
 export const REVERSE_PLATEAU_FRAC = 0.8;
 /** Default brake bias — 60 % front / 40 % rear (per the brake-fix spec). */
 export const DEFAULT_FRONT_BRAKE_BIAS = 0.6;
-/** Default steering lock (deg). Trimmed 32 → 30 so corner entry is less twitchy. */
-export const DEFAULT_MAX_STEER_DEG = 30;
 /**
- * Speed (m/s) at which steering lock has halved. Raised 18 → 22 so the lock
- * fades a touch more gently with speed — the car still tightens up at pace
- * (less twitch, less roll moment) without feeling numb in fast sweepers.
+ * Default steering lock (deg). Trimmed 30 → 26 so corner entry is calmer and the
+ * car turns in less aggressively — a realistic street-car rack rather than a
+ * twitchy go-kart. Lower lock also means less yaw the chassis has to recover
+ * from, which (with the firmer yaw damping below) tames the rear stepping out.
  */
-export const DEFAULT_STEER_SPEED_SCALE = 22;
+export const DEFAULT_MAX_STEER_DEG = 26;
+/**
+ * Speed (m/s) at which steering lock has halved. Lowered 22 → 15 so the lock
+ * fades off harder as speed builds — the front bites far less at pace, so the
+ * car can't snap into oversteer in fast corners. Slow-speed agility (parking,
+ * tight turns) is unaffected because the fade is near 1 at low speed.
+ */
+export const DEFAULT_STEER_SPEED_SCALE = 15;
+/**
+ * Default chassis ANGULAR damping (yaw/roll/pitch rate drag, Rapier units).
+ * This is the primary anti-oversteer lever: it resists yaw *rate*, so the rear
+ * can't whip around faster than the steering commands — the car settles into a
+ * turn instead of snapping into a slide. Raised 0.6 → 1.2 for a planted,
+ * realistic feel; the handbrake drift (which deliberately breaks rear grip)
+ * still overpowers it, so intentional slides are intact. Per-car via
+ * `manifest.tuning.angularDamping`.
+ */
+export const DEFAULT_ANGULAR_DAMPING = 1.2;
 
 // ── Coasting drag ────────────────────────────────────────────────────────────
 /**
@@ -233,6 +249,86 @@ export const MAX_COM_Y = -0.4;
 export const FRONT_SUSPENSION_STIFFNESS_MUL = 1.3;
 /** Chassis box bottom clearance above ground at the spawn pose (meters). */
 export const DEFAULT_GROUND_CLEARANCE = 0.3;
+/**
+ * Per-wheel suspension force ceiling, as a multiple of the car's STATIC corner
+ * load (`mass · g / wheelCount`). Rapier (like Bullet) defaults this cap to a
+ * flat 6000 N per wheel — fine for a ~1.2 t hatchback (≈2× its corner load) but
+ * far below a heavy vehicle's corner load (a 4.1 t Hummer needs ≈10 kN/corner),
+ * so the spring saturates, the chassis sinks until its collider rests on the
+ * ground, and the cuboid's friction drags the car like a permanent brake. Sizing
+ * the cap to the car's own weight gives every vehicle the same generous headroom
+ * for weight transfer, bumps, and landings regardless of mass. 4× the corner load
+ * = the whole car's weight on a single wheel — comfortably past any real load.
+ */
+export const SUSPENSION_MAX_FORCE_HEADROOM = 4;
+
+// ── Bike wheelie / stoppie (GTA-style stunts; bikes only) ────────────────────
+/**
+ * Held nose-UP angle (rad) for a wheelie. The controller PD-drives the chassis
+ * pitch to this target while ↓+throttle is held and releases to the anti-pitch
+ * when let go, so the front comes back down — the bike balances at the target
+ * instead of looping over.
+ */
+export const WHEELIE_TARGET_RAD = 38 * DEG;
+/** Held nose-DOWN angle (rad) for a stoppie (↑+brake). */
+export const STOPPIE_TARGET_RAD = 30 * DEG;
+/**
+ * PD stiffness (1/s², scaled by pitch inertia) that drives the chassis pitch to
+ * the wheelie/stoppie target. Must out-muscle the default anti-pitch (120) and
+ * gravity so the front actually lifts and HOLDS near the target; the tilt-rate
+ * damping keeps it from snapping. (Gravity sags the held angle a little below
+ * the target, which is why the target is set generously.)
+ */
+export const WHEELIE_PITCH_KP = 140;
+/** Minimum throttle to pop a wheelie / brake to pop a stoppie. */
+export const WHEELIE_MIN_THROTTLE = 0.35;
+export const STOPPIE_MIN_BRAKE = 0.35;
+/** Minimum forward speed (m/s) for each stunt — needs momentum, like GTA. */
+export const WHEELIE_MIN_SPEED_MS = 1.0;
+export const STOPPIE_MIN_SPEED_MS = 2.5;
+
+// ── Loop-ride assist (all vehicles) ──────────────────────────────────────────
+/**
+ * On the inside of a vertical loop the chassis must pitch a full turn to stay
+ * tangent to the track. Nothing on a raycast vehicle naturally does this — the
+ * suspension only pushes along its ray — so a flat-held chassis lags the curve,
+ * its wheels leave the surface, and it stalls halfway up no matter the speed. On
+ * top of that the upright stabiliser is built to keep the vehicle from EVER
+ * flipping. Together these make a real loop physically impossible at any speed.
+ *
+ * The assist detects the loop signature and, ONLY then, swaps the
+ * restore-to-world-up stabiliser for a restore-to-SURFACE-NORMAL one: it
+ * PD-aligns the chassis up-axis to the average wheel contact normal, actively
+ * pitching the vehicle around the loop so its wheels stay planted, and drives its
+ * speed kinematically (gravity only). Climbing energy is all entry speed, so too
+ * slow = stalls and slides back. Outside the gate the normal stabiliser runs
+ * unchanged, so cornering, jumps, and sideways crash recovery keep the "never
+ * flip" feel everywhere but a real loop. Applies to cars AND bikes.
+ *
+ * Gate (all required): at least {@link LOOP_ASSIST_MIN_CONTACTS} wheels reporting
+ * a contact normal (real footing); that surface banked past {@link
+ * LOOP_ASSIST_MIN_SURF_TILT_RAD} from level; and moving at least {@link
+ * LOOP_ASSIST_MIN_SPEED_MS} (a slow tip-over can't trip it).
+ *
+ * DESIGN CONSTRAINT: the threshold is keyed on the SURFACE bank, so any jump ramp
+ * steeper than it would also get "stuck" to and never launch. Every ramp in the
+ * stunt park is therefore kept below this angle (≤24°); only the loop's lead-in
+ * (≈30°) and ring exceed it. The loop-stunt "no false stick" test asserts the
+ * steepest ramp stays under this threshold, guarding the separation.
+ */
+export const LOOP_ASSIST_MIN_SURF_TILT_RAD = 27 * DEG;
+/** Forward speed (m/s) the vehicle must carry for the loop assist to engage. */
+export const LOOP_ASSIST_MIN_SPEED_MS = 5;
+/** Wheels that must report a contact normal before the assist trusts the footing. */
+export const LOOP_ASSIST_MIN_CONTACTS = 2;
+/**
+ * Alignment stiffness (1/s², scaled by roll inertia) pulling the chassis up-axis
+ * onto the contact normal. High, because it must track a normal that itself
+ * sweeps at v/R around the loop without lagging into a stall.
+ */
+export const LOOP_ASSIST_ALIGN_KP = 90;
+/** Alignment rate damping (1/s, scaled by roll inertia) — stops align overshoot. */
+export const LOOP_ASSIST_ALIGN_KD = 10;
 
 // ── ABS (basic anti-lock; controller-side) ───────────────────────────────────
 /**
@@ -322,6 +418,8 @@ export type CarFeel = {
   steerSpeedScale: number;
   /** Chassis linear damping (velocity-proportional coasting drag). */
   linearDamping: number;
+  /** Chassis angular damping (yaw/roll/pitch rate drag) — the anti-oversteer lever. */
+  angularDamping: number;
   /** Off-throttle engine-braking decel (m/s²), applied speed-gated. */
   engineBrakeDecelMs2: number;
   /** Brake-park hold decel (m/s²) — the firm hold a brake tap latches on a slope. */
@@ -353,6 +451,7 @@ export function resolveCarFeel(manifest: VehicleManifest): CarFeel {
     maxSteerRad: (t?.maxSteerDeg ?? DEFAULT_MAX_STEER_DEG) * DEG,
     steerSpeedScale: t?.steerSpeedScale ?? DEFAULT_STEER_SPEED_SCALE,
     linearDamping: t?.linearDamping ?? DEFAULT_LINEAR_DAMPING,
+    angularDamping: t?.angularDamping ?? DEFAULT_ANGULAR_DAMPING,
     engineBrakeDecelMs2: t?.engineBrakeG != null ? t.engineBrakeG * G : DEFAULT_ENGINE_BRAKE_DECEL_MS2,
     holdDecelMs2: t?.holdG != null ? t.holdG * G : DEFAULT_HOLD_DECEL_MS2,
     antirollKp: t?.antirollKp ?? DEFAULT_ANTIROLL_KP,

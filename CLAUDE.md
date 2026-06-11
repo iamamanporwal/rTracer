@@ -86,7 +86,9 @@ Two implementations of the same `VehicleVisual` interface:
 
 ### Weather + wet grip
 
-`createWeatherSystem()` owns sky, rain particles, and lighting atomically. `weather.wetness` (0–1) is piped to `vehicle.setGripMultiplier(1 - wetness * 0.3)` each render frame — grip is modified at runtime without mutating the zone's physics profile (the profile is read-only per session).
+`createWeatherSystem()` owns the sky dome, cloud field, rain particles, and lighting atomically. `weather.wetness` (0–1) is piped to `vehicle.setGripMultiplier(1 - wetness * 0.3)` each render frame — grip is modified at runtime without mutating the zone's physics profile (the profile is read-only per session).
+
+The **sky dome** (`sky.ts`) is a gradient + sun (disc/halo, aligned to the directional light) + night stars — no clouds. **Clouds** (`clouds.ts`) are a separate billboard field: at init it bakes soft cloud stamps from the source PNGs in `public/assets/sky/` (crop + mirror + rotate + blur + alpha-key) and scatters camera-following sprites that drift on wind and feather at the edges (so a cloud is never "cut"). Each preset in `weather.ts` sets the cloud tint + coverage and the dome's sun-glow + stars.
 
 ### Input contract
 

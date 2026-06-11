@@ -1,0 +1,75 @@
+{
+  "id": "vehicle_jawa",
+  "displayName": "Jawa Cafe Racer",
+  "version": "0.1.0",
+  "class": "bike",
+  "visualMesh": "model/scene.glb",
+  "proxyMesh": "model/scene.glb",
+  "skinning": "",
+  "rig": {
+    "wheels": [
+      { "position": [0.3, 0.31, 0.68], "radius": 0.31, "isDriven": false, "isSteered": true },
+      { "position": [-0.3, 0.31, 0.68], "radius": 0.31, "isDriven": false, "isSteered": true },
+      { "position": [0.3, 0.31, -0.68], "radius": 0.31, "isDriven": true, "isSteered": false },
+      { "position": [-0.3, 0.31, -0.68], "radius": 0.31, "isDriven": true, "isSteered": false }
+    ],
+    "seat": [0, 1.05, -0.1]
+  },
+  "mass": 190,
+  "inertiaTensor": [55, 70, 38],
+  "engine": {
+    "powerCurveHpAtRpm": [
+      [0, 20],
+      [3500, 38],
+      [6000, 52],
+      [8000, 58],
+      [9000, 50]
+    ],
+    "redline": 9000
+  },
+  "gearbox": {
+    "ratios": [2.7, 1.9, 1.45, 1.2, 1.0],
+    "final": 2.7,
+    "type": "manual"
+  },
+  "visual": {
+    "format": "glb",
+    "glb": "model/scene.glb",
+    "scale": 1.0,
+    "yaw": 0,
+    "offset": [0, 0, 0],
+    "steer": {
+      "axis": [0, 0.883, -0.469],
+      "maxDeg": 26
+    }
+  },
+  "rider": {
+    "fbx": "rider/x_bot.fbx",
+    "scale": 0.01,
+    "offset": [0, -0.44, -0.32],
+    "crashImpulse": 3200
+  },
+  "tuning": {
+    "driveAccelG": 0.7,
+    "brakeDecelG": 1.0,
+    "reverseAccelG": 0.3,
+    "maxReverseSpeedMul": 0.3,
+    "maxSteerDeg": 34,
+    "steerSpeedScale": 16,
+    "frontBrakeBias": 0.65,
+    "gripScale": 1.12,
+    "comHeightScale": 1.3,
+    "antirollKp": 90,
+    "antirollKd": 18,
+    "suspensionStiffnessScale": 1.25,
+    "suspensionTravelScale": 0.95,
+    "rideHeight": 0.3
+  },
+  "audio": {
+    "kind": "inline",
+    "idleHz": 70,
+    "revHz": 900,
+    "gain": 0.4
+  },
+  "credits": "Bike: \"Motorcycle - Custom Bike (Jawa low-poly)\" (Sketchfab). Rider: Adobe Mixamo \"X Bot\"."
+}

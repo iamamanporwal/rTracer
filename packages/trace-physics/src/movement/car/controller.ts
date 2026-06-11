@@ -26,15 +26,29 @@ import {
   COAST_BRAKE_TAPER_MS,
   FORWARD_AXIS,
   FORWARD_SIGN,
+  G,
   HANDBRAKE_SLIP_REF_SPEED_MS,
+  LOOP_ASSIST_ALIGN_KD,
+  LOOP_ASSIST_ALIGN_KP,
+  LOOP_ASSIST_MIN_CONTACTS,
+  LOOP_ASSIST_MIN_SPEED_MS,
+  LOOP_ASSIST_MIN_SURF_TILT_RAD,
   MAX_ANTIROLL_ANGLE_RAD,
   MAX_REVERSE_SPEED_MS,
   PARK_BRAKE_SPEED_MS,
   resolveCarFeel,
   REVERSE_ENGAGE_DELAY_S,
   SLOPE_DETECT_MS2,
+  STOPPIE_MIN_BRAKE,
+  STOPPIE_MIN_SPEED_MS,
+  STOPPIE_TARGET_RAD,
   SUSPENSION_DIR,
+  SUSPENSION_MAX_FORCE_HEADROOM,
   UP_AXIS,
+  WHEELIE_MIN_SPEED_MS,
+  WHEELIE_MIN_THROTTLE,
+  WHEELIE_PITCH_KP,
+  WHEELIE_TARGET_RAD,
 } from './config';
 import { deriveCarChassis, deriveRestHubLocalY } from './chassis';
 import { computeDriveCommand, deriveDrivetrainParams } from './drivetrain';
@@ -90,6 +104,10 @@ export function createCarController(
   // the guard out.
   const pitchInertia = Math.max(manifest.inertiaTensor[0] ?? 0, 1);
 
+  // Bikes get the GTA wheelie/stoppie stunt controls (↓+throttle / ↑+brake);
+  // cars ignore the pitch-lean input entirely.
+  const isBike = manifest.class === 'bike';
+
   // World gravity, cached (constant per session). Used to detect when the car is
   // parked on a grade — `gravity · chassisForward` is the pull along the car's
   // travel axis — so it can free-roll there instead of being brake-held.
@@ -122,7 +140,7 @@ export function createCarController(
       w: spawn.rotation[3],
     })
     .setLinearDamping(feel.linearDamping)
-    .setAngularDamping(0.6);
+    .setAngularDamping(feel.angularDamping);
   // Supply mass with a low, central COM for roll resistance; the collider is
   // massless so the two don't stack.
   bodyDesc.setAdditionalMassProperties(
@@ -158,6 +176,13 @@ export function createCarController(
   controller.indexUpAxis = UP_AXIS;
   controller.setIndexForwardAxis = FORWARD_AXIS;
 
+  // Per-wheel suspension force ceiling sized to THIS car's weight. Rapier's flat
+  // 6000 N default saturates under a heavy vehicle's corner load, dropping the
+  // chassis onto the ground (the cuboid then drags like a parking brake — felt as
+  // the car being unable to accelerate / "auto-braking" at low speed). Scaling
+  // the cap with mass gives every car the same headroom regardless of weight.
+  const maxSuspensionForce = (manifest.mass * G * SUSPENSION_MAX_FORCE_HEADROOM) / wheelCount;
+
   for (let i = 0; i < wheelCount; i++) {
     const w = chassis.wheels[i];
     if (!w) continue;
@@ -173,6 +198,7 @@ export function createCarController(
     controller.setWheelSuspensionCompression(i, chassis.suspension.compression);
     controller.setWheelSuspensionRelaxation(i, chassis.suspension.relaxation);
     controller.setWheelMaxSuspensionTravel(i, chassis.suspension.maxTravel);
+    controller.setWheelMaxSuspensionForce(i, maxSuspensionForce);
     controller.setWheelFrictionSlip(i, chassis.frictionSlip);
     controller.setWheelSideFrictionStiffness(i, chassis.sideFrictionStiffness);
   }
@@ -258,6 +284,13 @@ export function createCarController(
   // commanded velocity and a wheel-derived value — the chassis still moves at
   // the slammed speed, but the readings flicker).
   let reverseSpeed = 0;
+  // Loop-ride assist state. While the bike rides a vertical loop we drive its
+  // speed kinematically (gravity only) instead of trusting the force-capped
+  // suspension; `loopSpeed` tracks that across steps because — exactly like
+  // reverseSpeed — the body's own linvel() reading is bled by the wheel-friction
+  // loop each step. Seeded from the real speed on entry, reset to 0 on exit.
+  let loopSpeed = 0;
+  let inLoop = false;
   // Brake-park latch: a quick tap of the foot brake at a near-standstill clamps a
   // firm parking hold on so the car stays put even on a slope until the player
   // drives away (throttle / handbrake / reverse release it). Off-throttle coasting
@@ -538,32 +571,59 @@ export function createCarController(
             ? roll + ANTIROLL_DEADZONE_RAD
             : 0;
 
-      // Chassis forward (roll torque axis) and up (yaw axis) in world space.
+      // Chassis forward (roll torque axis), up (yaw axis), and lateral (the
+      // pitch torque axis) in world space.
       rotateByQuat(q, 0, 0, 1, worldFwd);
       rotateByQuat(q, 0, 1, 0, worldUp);
+      rotateByQuat(q, 1, 0, 0, worldRight);
+
+      // ── Pitch control: chassis pitch about the lateral axis ──
+      // Pitch = world-up tipped about lateral: nose-DOWN (stoppie) drops localUp
+      // toward forward → pitch > 0; nose-UP (wheelie) → pitch < 0. A +worldRight
+      // torque REDUCES pitch, so any target is held by PD-ing on (pitch - target).
+      let pitch = Math.atan2(localUp.z, localUp.y);
+      if (pitch > MAX_ANTIROLL_ANGLE_RAD) pitch = MAX_ANTIROLL_ANGLE_RAD;
+      else if (pitch < -MAX_ANTIROLL_ANGLE_RAD) pitch = -MAX_ANTIROLL_ANGLE_RAD;
+
+      // Player-commanded wheelie / stoppie (bikes only, GTA scheme): ↓ + throttle
+      // pops a wheelie, ↑ + brake a stoppie. We PD-drive the pitch to a fixed
+      // target so the bike BALANCES at the angle (never loops over), and release
+      // to the anti-pitch below the instant the input lets go so it comes down.
+      let pitchTorque = 0;
+      let stuntActive = false;
+      if (isBike && (ci.pitchLean > 0.5 || ci.pitchLean < -0.5)) {
+        // Forward speed = linear velocity projected on the chassis forward axis
+        // (+ = moving forward). Robust to Rapier's currentVehicleSpeed() sign.
+        const lv = body.linvel();
+        const fwd = lv.x * worldFwd.x + lv.y * worldFwd.y + lv.z * worldFwd.z;
+        const wheelie =
+          ci.pitchLean > 0.5 && ci.throttle > WHEELIE_MIN_THROTTLE && fwd > WHEELIE_MIN_SPEED_MS;
+        const stoppie =
+          ci.pitchLean < -0.5 && ci.brake > STOPPIE_MIN_BRAKE && fwd > STOPPIE_MIN_SPEED_MS;
+        if (wheelie || stoppie) {
+          stuntActive = true;
+          // pitch > 0 = nose UP (front lifts = wheelie); pitch < 0 = nose DOWN
+          // (rear lifts = stoppie).
+          const target = wheelie ? WHEELIE_TARGET_RAD : -STOPPIE_TARGET_RAD;
+          pitchTorque = pitchInertia * WHEELIE_PITCH_KP * (pitch - target);
+        }
+      }
 
       // ── Anti-stoppie / anti-wheelie (gated pitch restore) ──
-      // Pitch = world-up tipped about the lateral axis: nose-down drops localUp
-      // toward the car's forward axis. The guard is GATED on exactly one axle
-      // being airborne (front XOR rear) so it fires only on a genuine stoppie /
-      // wheelie — never on a slope or in cornering, where all four wheels touch
-      // down. Past a small deadzone it pulls the lifted axle back to the ground
-      // with a torque about the chassis lateral (X) axis, scaled by pitch inertia
-      // so kp reads as an acceleration. So the car skids flat under hard braking.
-      let restorePitch = 0;
-      if (frontGrounded !== rearGrounded && feel.antipitchKp > 0) {
-        let pitch = Math.atan2(localUp.z, localUp.y);
-        if (pitch > MAX_ANTIROLL_ANGLE_RAD) pitch = MAX_ANTIROLL_ANGLE_RAD;
-        else if (pitch < -MAX_ANTIROLL_ANGLE_RAD) pitch = -MAX_ANTIROLL_ANGLE_RAD;
+      // GATED on exactly one axle airborne (front XOR rear) — the stoppie/wheelie
+      // signature — so it never fires on a slope or in cornering. Suppressed while
+      // a player stunt is active (above) so the wheelie/stoppie isn't fought.
+      // Past a small deadzone it pulls the lifted axle back down, scaled by pitch
+      // inertia so kp reads as an acceleration.
+      if (!stuntActive && frontGrounded !== rearGrounded && feel.antipitchKp > 0) {
         const activePitch =
           pitch > ANTIPITCH_DEADZONE_RAD
             ? pitch - ANTIPITCH_DEADZONE_RAD
             : pitch < -ANTIPITCH_DEADZONE_RAD
               ? pitch + ANTIPITCH_DEADZONE_RAD
               : 0;
-        restorePitch = pitchInertia * feel.antipitchKp * activePitch;
+        pitchTorque = pitchInertia * feel.antipitchKp * activePitch;
       }
-      rotateByQuat(q, 1, 0, 0, worldRight);
 
       // Tilt rate = angular velocity with its yaw component (about the car's own
       // up) removed, so we damp roll AND pitch but never the player's steering.
@@ -573,17 +633,110 @@ export function createCarController(
       const tiltY = av.y - spin * worldUp.y;
       const tiltZ = av.z - spin * worldUp.z;
 
+      // ── Loop-ride assist (all vehicles) ──
+      // A raycast chassis won't pitch itself to follow a vertical loop, so it
+      // lags the curve, loses contact, and stalls partway up. When the loop
+      // signature is present — steeply banked, moving, real footing — we swap the
+      // restore-to-world-up stabiliser for restore-to-SURFACE-NORMAL: PD-align the
+      // chassis up onto the average wheel contact normal, actively pitching the
+      // vehicle around the loop so its wheels stay planted, and drive its speed
+      // kinematically. Climbing energy is still all entry speed, so too slow
+      // stalls and slides back. The steep surface-bank gate excludes every jump
+      // ramp in the park and any wheelie/stoppie — only a real loop exceeds it.
+      let loopMode = false;
+      // Cheap pre-gate: only a tilted vehicle can be on a loop. Skips the
+      // per-frame wheel-contact-normal scan (which allocates) during normal flat
+      // driving — the chassis is well past this by the time it's on the lead-in/
+      // ring. Applies to cars and bikes alike (the loop is built for every
+      // vehicle); the steep surface-bank gate below keeps it off jump ramps.
+      if (worldUp.y < 0.97) {
+        // Average wheel contact normal — keyed on the SURFACE so the assist
+        // engages the moment the wheels reach the steep part of the loop, before
+        // momentum bleeds, rather than waiting for the chassis to pitch.
+        let nx = 0;
+        let ny = 0;
+        let nz = 0;
+        let contacts = 0;
+        for (let i = 0; i < wheelCount; i++) {
+          if (!controller.wheelIsInContact(i)) continue;
+          const n = controller.wheelContactNormal(i);
+          if (!n) continue;
+          nx += n.x;
+          ny += n.y;
+          nz += n.z;
+          contacts++;
+        }
+        const len = Math.hypot(nx, ny, nz);
+        if (contacts >= LOOP_ASSIST_MIN_CONTACTS && len > 1e-3) {
+          const inv = 1 / len;
+          nx *= inv;
+          ny *= inv;
+          nz *= inv;
+          const lv = body.linvel();
+          const fwd = lv.x * worldFwd.x + lv.y * worldFwd.y + lv.z * worldFwd.z;
+          if (ny < Math.cos(LOOP_ASSIST_MIN_SURF_TILT_RAD) && Math.abs(fwd) > LOOP_ASSIST_MIN_SPEED_MS) {
+            loopMode = true;
+            // (1) Align chassis up onto the surface normal. Error axis = up × n is
+            // the rotation that brings them together (mostly the loop's pitch).
+            const ex = worldUp.y * nz - worldUp.z * ny;
+            const ey = worldUp.z * nx - worldUp.x * nz;
+            const ez = worldUp.x * ny - worldUp.y * nx;
+            const kp = rollInertia * LOOP_ASSIST_ALIGN_KP;
+            const kdA = rollInertia * LOOP_ASSIST_ALIGN_KD;
+            stabilizerOut.x = (kp * ex - kdA * tiltX) * dt;
+            stabilizerOut.y = (kp * ey - kdA * tiltY) * dt;
+            stabilizerOut.z = (kp * ez - kdA * tiltZ) * dt;
+            body.applyTorqueImpulse(stabilizerOut, true);
+
+            // (2) Drive the loop kinematically. A vertical loop demands a
+            // centripetal force far past the suspension force cap, so left to the
+            // raycast solver the bike plows into saturated springs and the
+            // wheel-friction loop bleeds most of its speed. Instead we re-point
+            // the velocity along the surface tangent and evolve only its
+            // MAGNITUDE by gravity — a lossless ride bar the real climb. Too slow
+            // therefore stalls and slides back (the speed gate then drops the
+            // assist and it falls off), exactly the "needs a certain speed" rule;
+            // fast enough carries cleanly over the top.
+            const vn = lv.x * nx + lv.y * ny + lv.z * nz;
+            const tx = lv.x - vn * nx;
+            const ty = lv.y - vn * ny;
+            const tz = lv.z - vn * nz;
+            const s = Math.hypot(tx, ty, tz);
+            if (s > 1e-3) {
+              const ih = 1 / s;
+              const hy = ty * ih;
+              // Track the loop speed ourselves — the solver bleeds the body's
+              // linvel each step, so we seed from the real speed on entry and
+              // thereafter evolve it by gravity ALONE (lossless bar the climb).
+              loopSpeed = inLoop ? Math.max(loopSpeed - G * hy * dt, 0) : s;
+              inLoop = true;
+              const k = loopSpeed * ih;
+              linvelOut.x = tx * k;
+              linvelOut.y = ty * k;
+              linvelOut.z = tz * k;
+              body.setLinvel(linvelOut, true);
+            }
+          }
+        }
+      }
+
       // Restoring torque (about forward) minus rate damping (about the tilt).
       // Both scaled by roll inertia so kp/kd read as accelerations, not N·m.
       // Applied as a per-step torque IMPULSE (torque × dt): Rapier's addTorque
       // persists and accumulates across steps until reset, which would build an
       // unbounded torque when called every tick — applyTorqueImpulse is one-shot.
-      const restore = -rollInertia * feel.antirollKp * activeRoll;
-      const kd = rollInertia * feel.antirollKd;
-      stabilizerOut.x = (worldFwd.x * restore + worldRight.x * restorePitch - kd * tiltX) * dt;
-      stabilizerOut.y = (worldFwd.y * restore + worldRight.y * restorePitch - kd * tiltY) * dt;
-      stabilizerOut.z = (worldFwd.z * restore + worldRight.z * restorePitch - kd * tiltZ) * dt;
-      body.applyTorqueImpulse(stabilizerOut, true);
+      // Suppressed while the loop assist owns the chassis (above); leaving the
+      // loop also reseeds the tracked loop speed for the next entry.
+      if (!loopMode) {
+        inLoop = false;
+        loopSpeed = 0;
+        const restore = -rollInertia * feel.antirollKp * activeRoll;
+        const kd = rollInertia * feel.antirollKd;
+        stabilizerOut.x = (worldFwd.x * restore + worldRight.x * pitchTorque - kd * tiltX) * dt;
+        stabilizerOut.y = (worldFwd.y * restore + worldRight.y * pitchTorque - kd * tiltY) * dt;
+        stabilizerOut.z = (worldFwd.z * restore + worldRight.z * pitchTorque - kd * tiltZ) * dt;
+        body.applyTorqueImpulse(stabilizerOut, true);
+      }
     }
 
     // ── Reverse propulsion bypass ────────────────────────────────────────────

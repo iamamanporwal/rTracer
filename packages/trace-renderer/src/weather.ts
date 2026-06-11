@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 import { createAnimeSky, type SkyHandle, type SkyTint } from './sky';
+import { createCloudField, type CloudFieldHandle } from './clouds';
 import { createRain, type RainHandle } from './rain';
 import type { SceneBundle } from './scene';
 
 /**
- * Weather system per blueprint §14 + the anime-sky / rain addition.
+ * Weather system per blueprint §14 + the dramatic-sky / cloud / rain addition.
  *
- * Consolidates sky + rain + lighting under a single seam so the session can
- * cycle presets atomically and push a single `wetness` value to physics.
- * Presets ship lighting *and* sky tint *and* rain intensity together; nothing
- * downstream gets to see them out of sync.
+ * Consolidates sky + clouds + rain + lighting under a single seam so the session
+ * can cycle presets atomically and push a single `wetness` value to physics.
+ * Presets ship lighting *and* sky tint *and* cloud cover *and* rain intensity
+ * together; nothing downstream gets to see them out of sync.
  *
  * - **Apply** is allocation-light (a couple scratch colors); fine for a
  *   key-press handler, not the render hot path.
@@ -27,9 +28,11 @@ export type WeatherPreset = {
   label: string;
   /** Sky zenith (top of dome). */
   skyTop: `#${string}`;
+  /** Sky mid band — the gradient stop between horizon and zenith. */
+  skyMid: `#${string}`;
   /** Sky horizon. */
   skyHorizon: `#${string}`;
-  /** Stylized cloud tint — gray for rain, golden for sunset. */
+  /** Cloud tint — multiplied over the stamps. Gray for rain, golden for sunset. */
   cloudColor: `#${string}`;
   /** 0..1 — fraction of sky covered. */
   cloudCoverage: number;
@@ -37,6 +40,12 @@ export type WeatherPreset = {
   rainIntensity: number;
   sunColor: `#${string}`;
   sunIntensity: number;
+  /** Broad atmospheric halo colour around the sun in the dome. */
+  sunGlowColor: `#${string}`;
+  /** 0..~1.5 — sun-halo intensity. 0 hides the sun (overcast/storm). */
+  sunGlowStrength: number;
+  /** 0..1 — night star field intensity. */
+  starStrength: number;
   /** Sun direction before normalization; a low vector reads as a low sun. */
   sunDirection: [number, number, number];
   ambientSky: `#${string}`;
@@ -52,15 +61,19 @@ export const WEATHER_PRESETS: readonly WeatherPreset[] = [
   {
     id: 'clear',
     label: 'Clear',
-    // Anime-saturated: deep zenith blue, still-blue horizon. Horizon stays
-    // saturated enough that chase-cam framing reads as sky, not fog.
-    skyTop: '#2a8cff',
-    skyHorizon: '#9fd5ff',
+    // Saturated blue depth: deep zenith, luminous mid band, soft-blue horizon —
+    // the horizon stays blue enough that chase-cam framing reads as sky, not fog.
+    skyTop: '#1466e6',
+    skyMid: '#3f94ff',
+    skyHorizon: '#bfe6ff',
     cloudColor: '#ffffff',
-    cloudCoverage: 0.32,
+    cloudCoverage: 0.4,
     rainIntensity: 0,
-    sunColor: '#fff4e0',
+    sunColor: '#fff4d6',
     sunIntensity: 2.2,
+    sunGlowColor: '#ffe9b0',
+    sunGlowStrength: 0.55,
+    starStrength: 0,
     sunDirection: [-0.6, 1, 0.4],
     ambientSky: '#7ab0d8',
     ambientGround: '#3a2a1a',
@@ -73,12 +86,16 @@ export const WEATHER_PRESETS: readonly WeatherPreset[] = [
     id: 'overcast',
     label: 'Overcast',
     skyTop: '#8a96a3',
-    skyHorizon: '#c3c8cd',
-    cloudColor: '#c5cad0',
-    cloudCoverage: 0.85,
+    skyMid: '#a6aeb7',
+    skyHorizon: '#cdd2d7',
+    cloudColor: '#c2c8cf',
+    cloudCoverage: 0.92,
     rainIntensity: 0,
     sunColor: '#dfe4ea',
     sunIntensity: 0.9,
+    sunGlowColor: '#c8ccd2',
+    sunGlowStrength: 0.12,
+    starStrength: 0,
     sunDirection: [-0.3, 1, 0.2],
     ambientSky: '#b3bcc4',
     ambientGround: '#4a4640',
@@ -90,14 +107,20 @@ export const WEATHER_PRESETS: readonly WeatherPreset[] = [
   {
     id: 'golden',
     label: 'Golden Hour',
-    skyTop: '#3a6fc8',
-    skyHorizon: '#ff9b4a',
-    cloudColor: '#ffc070',
-    cloudCoverage: 0.42,
+    // Deep blue zenith, warm mid, blazing orange horizon — a strong, low sun
+    // halo does the dramatic work.
+    skyTop: '#18356f',
+    skyMid: '#e07a45',
+    skyHorizon: '#ffd089',
+    cloudColor: '#ffb978',
+    cloudCoverage: 0.5,
     rainIntensity: 0,
-    sunColor: '#ff9a48',
+    sunColor: '#ffd9a0',
     sunIntensity: 2.7,
-    sunDirection: [-0.92, 0.22, 0.32],
+    sunGlowColor: '#ff7a30',
+    sunGlowStrength: 1.35,
+    starStrength: 0,
+    sunDirection: [-0.92, 0.18, 0.32],
     ambientSky: '#caa07a',
     ambientGround: '#2a1d12',
     ambientIntensity: 0.5,
@@ -108,13 +131,17 @@ export const WEATHER_PRESETS: readonly WeatherPreset[] = [
   {
     id: 'night',
     label: 'Night',
-    skyTop: '#070b16',
-    skyHorizon: '#16213a',
-    cloudColor: '#3b4666',
-    cloudCoverage: 0.5,
+    skyTop: '#04060d',
+    skyMid: '#0c1426',
+    skyHorizon: '#1a2742',
+    cloudColor: '#2c3450',
+    cloudCoverage: 0.45,
     rainIntensity: 0,
-    sunColor: '#aebcff',
+    sunColor: '#cdd6ff',
     sunIntensity: 0.5,
+    sunGlowColor: '#46588c',
+    sunGlowStrength: 0.5,
+    starStrength: 1.0,
     sunDirection: [-0.4, 0.9, -0.3],
     ambientSky: '#26324d',
     ambientGround: '#0a0c12',
@@ -126,13 +153,17 @@ export const WEATHER_PRESETS: readonly WeatherPreset[] = [
   {
     id: 'storm',
     label: 'Storm',
-    skyTop: '#2a2f37',
-    skyHorizon: '#4b525b',
-    cloudColor: '#3a4048',
-    cloudCoverage: 0.95,
+    skyTop: '#1d2127',
+    skyMid: '#333a42',
+    skyHorizon: '#565d66',
+    cloudColor: '#343a44',
+    cloudCoverage: 0.97,
     rainIntensity: 1.0,
     sunColor: '#8f9aa8',
     sunIntensity: 0.6,
+    sunGlowColor: '#4a525c',
+    sunGlowStrength: 0.08,
+    starStrength: 0,
     sunDirection: [-0.5, 0.85, 0.15],
     ambientSky: '#525a64',
     ambientGround: '#1a1d22',
@@ -174,14 +205,19 @@ export function createWeatherSystem(opts: CreateWeatherSystemOptions): WeatherSy
   const { scene, sun, ambient, maxRainParticles, initialIndex = 0 } = opts;
 
   const sky: SkyHandle = createAnimeSky(scene);
+  const clouds: CloudFieldHandle = createCloudField(scene);
   const rain: RainHandle = createRain(scene, { maxParticles: maxRainParticles });
 
-  // Reused scratch buffers for `applyPreset` — alloc-light.
+  // Reused scratch buffer for `applyPreset` — alloc-light.
   const tint: SkyTint = {
     zenith: '#000000',
+    mid: '#000000',
     horizon: '#000000',
-    cloud: '#000000',
-    coverage: 0,
+    sunColor: '#000000',
+    sunGlow: '#000000',
+    sunGlowStrength: 0,
+    sunDir: [0, 1, 0],
+    starStrength: 0,
   };
 
   let current: WeatherPreset = WEATHER_PRESETS[clampIndex(initialIndex)]!;
@@ -213,12 +249,22 @@ export function createWeatherSystem(opts: CreateWeatherSystemOptions): WeatherSy
     if (scene.background instanceof THREE.Color) scene.background.set(next.skyHorizon);
     else scene.background = new THREE.Color(next.skyHorizon);
 
-    // Sky shader uniforms.
+    // Sky dome — gradient + sun (aligned to the directional light) + stars.
     tint.zenith = next.skyTop;
+    tint.mid = next.skyMid;
     tint.horizon = next.skyHorizon;
-    tint.cloud = next.cloudColor;
-    tint.coverage = next.cloudCoverage;
+    tint.sunColor = next.sunColor;
+    tint.sunGlow = next.sunGlowColor;
+    tint.sunGlowStrength = next.sunGlowStrength;
+    tint.sunDir[0] = next.sunDirection[0];
+    tint.sunDir[1] = next.sunDirection[1];
+    tint.sunDir[2] = next.sunDirection[2];
+    tint.starStrength = next.starStrength;
     sky.setTint(tint);
+
+    // Cloud billboards — recolour + set coverage.
+    clouds.setTint(next.cloudColor);
+    clouds.setCoverage(next.cloudCoverage);
 
     // Rain.
     rain.setIntensity(next.rainIntensity);
@@ -237,15 +283,18 @@ export function createWeatherSystem(opts: CreateWeatherSystemOptions): WeatherSy
     },
     applyPreset,
     update(dt, cameraPos) {
-      // Anchor sky + rain to the camera each frame so an "infinite sky" reads
-      // without clipping and the rain field always wraps the player.
+      // Anchor sky + clouds + rain to the camera each frame so an "infinite sky"
+      // reads without clipping and the fields always wrap the player.
       sky.setCameraAnchor(cameraPos.x, cameraPos.y, cameraPos.z);
       sky.update(dt);
+      clouds.setCameraAnchor(cameraPos.x, cameraPos.y, cameraPos.z);
+      clouds.update(dt);
       rain.setCameraAnchor(cameraPos.x, cameraPos.z);
       rain.update(dt);
     },
     dispose() {
       sky.dispose();
+      clouds.dispose();
       rain.dispose();
     },
   };

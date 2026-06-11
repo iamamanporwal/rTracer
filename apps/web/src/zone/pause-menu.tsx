@@ -12,6 +12,7 @@ import {
   Minimize,
   Wrench,
   Ghost,
+  PersonStanding,
   X,
 } from 'lucide-react';
 import {
@@ -45,6 +46,8 @@ export function PauseMenu({
   onDevModeChange,
   skeleton,
   onSkeletonChange,
+  vehicleId,
+  vehicleIsBike,
 }: {
   session: ZoneSession | null;
   cameraLabel: string;
@@ -56,6 +59,10 @@ export function PauseMenu({
   onDevModeChange: (next: boolean) => void;
   skeleton: boolean;
   onSkeletonChange: (next: boolean) => void;
+  /** Current vehicle id — passed to the dev rider pose editor. */
+  vehicleId: string;
+  /** Whether the current vehicle is a bike (the pose editor only applies to bikes). */
+  vehicleIsBike: boolean;
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -180,6 +187,19 @@ export function PauseMenu({
                     value={skeleton ? 'On' : 'Off'}
                     active={skeleton}
                     onClick={() => onSkeletonChange(!skeleton)}
+                  />
+                )}
+                {/* Rider pose editor — dev builds only (the page isn't in the prod
+                    bundle), and only for bikes (cars have no rider). Opens in a
+                    new tab so the session keeps running. */}
+                {devMode && import.meta.env.DEV && vehicleIsBike && (
+                  <Item
+                    icon={<PersonStanding size={18} />}
+                    label="Rider Pose Editor"
+                    value="Open ↗"
+                    onClick={() =>
+                      window.open(`/pose-editor.html?v=${encodeURIComponent(vehicleId)}`, '_blank')
+                    }
                   />
                 )}
               </div>

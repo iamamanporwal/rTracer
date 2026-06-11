@@ -4,10 +4,18 @@ import type { VehicleManifest, ZoneManifest } from '@trace/core';
 import { useStore } from '~/store';
 import { loadVehicleManifest, loadZoneManifest, useAsync } from '~/manifests';
 import { useIsTouch } from '~/lib/use-device';
-import { startZoneSession, type SessionStats, type ZoneSession } from './session';
+import {
+  startZoneSession,
+  type ReplayHandle,
+  type ReplayState,
+  type SessionStats,
+  type ZoneSession,
+} from './session';
 import { TouchControls } from './touch-controls';
 import { PauseMenu } from './pause-menu';
 import { Speedometer } from './speedometer';
+import { TelemetryOverlay } from './telemetry-overlay';
+import { ReplayOverlay } from './replay-overlay';
 
 /**
  * `/play/$zoneId` route — mounts the Three.js canvas and starts a zone session.
@@ -82,13 +90,34 @@ function CanvasMount(props: {
   // Mirror the session into state so the touch pad / pause menu re-render once
   // it's live (refs alone don't trigger a render).
   const [session, setSession] = useState<ZoneSession | null>(null);
-  const [stats, setStats] = useState<SessionStats>({ speedMs: 0, fps: 60, position: { x: 0, y: 0, z: 0 }, headingDeg: 0 });
+  const [stats, setStats] = useState<SessionStats>({
+    speedMs: 0,
+    fps: 60,
+    position: { x: 0, y: 0, z: 0 },
+    headingDeg: 0,
+    input: {
+      throttle: false,
+      brake: false,
+      left: false,
+      right: false,
+      handbrake: false,
+      up: false,
+      down: false,
+      arrowLeft: false,
+      arrowRight: false,
+    },
+    telemetry: { recording: false, frameCount: 0, hitCount: 0, durationS: 0 },
+  });
   const [weather, setWeather] = useState<string>('Clear');
   const [camera, setCamera] = useState<string>('Chase');
   const [skeleton, setSkeletonState] = useState<boolean>(false);
   const [devMode, setDevModeState] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  // Replay transport state — non-null while the 3D replay player is open. The
+  // handle (control methods) lives in a ref; the state drives the overlay.
+  const [replay, setReplay] = useState<ReplayState | null>(null);
+  const replayHandleRef = useRef<ReplayHandle | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -126,6 +155,9 @@ function CanvasMount(props: {
       sessionRef.current?.dispose();
       sessionRef.current = null;
       setSession(null);
+      // Drop any open replay — its handle is owned by the disposed session.
+      replayHandleRef.current = null;
+      setReplay(null);
     };
   }, [props.zone, props.vehicle, props.liveryColor, isTouch]);
 
@@ -140,6 +172,34 @@ function CanvasMount(props: {
     // overlay off in the session (which fires onSkeleton → React state).
     sessionRef.current?.setDevMode(next);
     setDevModeState(next);
+  };
+
+  const downloadTelemetry = (): void => {
+    const session = sessionRef.current;
+    if (!session) return;
+    const csv = session.telemetryCsv();
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    // ISO timestamp with `:`/`.` stripped so it's a clean filename on every OS.
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    a.download = `rtracer-telemetry-${props.zone.id}-${stamp}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const startReplay = (): void => {
+    const session = sessionRef.current;
+    if (!session) return;
+    const handle = session.enterReplay((s) => setReplay(s));
+    if (handle) replayHandleRef.current = handle;
+  };
+
+  const exitReplay = (): void => {
+    replayHandleRef.current?.exit();
+    replayHandleRef.current = null;
+    setReplay(null);
   };
 
   if (error) {
@@ -175,9 +235,21 @@ function CanvasMount(props: {
           </div>
         </div>
       )}
-      <Hud stats={stats} devMode={devMode} isTouch={isTouch} />
-      {isTouch && !loading && <TouchControls session={session} />}
-      {!loading && (
+      {/* Live HUD + dev overlays — hidden while the 3D replay player owns the view. */}
+      {!replay && <Hud stats={stats} devMode={devMode} isTouch={isTouch} />}
+      {devMode && !loading && !replay && (
+        <TelemetryOverlay
+          input={stats.input}
+          telemetry={stats.telemetry}
+          isTouch={isTouch}
+          onStart={() => sessionRef.current?.startTelemetry()}
+          onStop={() => sessionRef.current?.stopTelemetry()}
+          onDownload={downloadTelemetry}
+          onPlay={startReplay}
+        />
+      )}
+      {isTouch && !loading && !replay && <TouchControls session={session} />}
+      {!loading && !replay && (
         <PauseMenu
           session={session}
           cameraLabel={camera}
@@ -189,7 +261,12 @@ function CanvasMount(props: {
           onDevModeChange={toggleDevMode}
           skeleton={skeleton}
           onSkeletonChange={toggleSkeleton}
+          vehicleId={props.vehicle.id}
+          vehicleIsBike={props.vehicle.class === 'bike'}
         />
+      )}
+      {replay && replayHandleRef.current && (
+        <ReplayOverlay state={replay} handle={replayHandleRef.current} onExit={exitReplay} />
       )}
     </div>
   );
