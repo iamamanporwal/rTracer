@@ -2,13 +2,13 @@ import * as THREE from 'three';
 
 /**
  * Dramatic stylized sky dome — a rich vertical gradient with a real sun (disc +
- * atmospheric halo) and a night star field. One draw call, a handful of cheap
- * fragment ops, ~640 verts — basically free on mobile.
+ * atmospheric halo). One draw call, a handful of cheap fragment ops, ~640 verts —
+ * basically free on mobile.
  *
  * Clouds used to be painted here by spherically projecting a blob texture and
  * thresholding it; that sliced clouds along the horizon and pinched them at the
  * zenith (the "cut" bug). Clouds now live in {@link createCloudField} as real
- * billboards, so this dome owns only the sky itself: gradient, sun, stars.
+ * billboards, so this dome owns only the sky itself: gradient + sun.
  *
  * Tone-mapping and fog are disabled on the dome so the saturated palette and the
  * sun bloom survive ACES (golden hour stays punchy, not washed to beige). Render
@@ -37,8 +37,6 @@ export type SkyTint = {
   sunGlowStrength: number;
   /** Direction toward the sun; normalized in-shader. Match the directional light. */
   sunDir: [number, number, number];
-  /** 0..1 — night star field intensity. 0 on daytime presets. */
-  starStrength: number;
 };
 
 export type SkyHandle = {
@@ -65,8 +63,6 @@ export function createAnimeSky(scene: THREE.Scene): SkyHandle {
     uSunGlow: { value: new THREE.Color('#ffe9b0') },
     uSunGlowStrength: { value: 0.5 },
     uSunDir: { value: new THREE.Vector3(-0.6, 1, 0.4).normalize() },
-    uStarStrength: { value: 0 },
-    uTime: { value: 0 },
   };
 
   const material = new THREE.ShaderMaterial({
@@ -99,13 +95,12 @@ export function createAnimeSky(scene: THREE.Scene): SkyHandle {
       (uniforms.uSunDir!.value as THREE.Vector3)
         .set(tint.sunDir[0], tint.sunDir[1], tint.sunDir[2])
         .normalize();
-      uniforms.uStarStrength!.value = clamp01(tint.starStrength);
     },
     setCameraAnchor(x, y, z) {
       mesh.position.set(x, y, z);
     },
-    update(dt) {
-      uniforms.uTime!.value += dt;
+    update() {
+      // The dome is static now (no animated clouds/stars). Kept for API parity.
     },
     dispose() {
       mesh.removeFromParent();
@@ -135,13 +130,7 @@ const FRAG = /* glsl */ `
   uniform vec3 uSunGlow;
   uniform float uSunGlowStrength;
   uniform vec3 uSunDir;
-  uniform float uStarStrength;
-  uniform float uTime;
   varying vec3 vDir;
-
-  float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-  }
 
   void main() {
     vec3 dir = normalize(vDir);
@@ -164,20 +153,6 @@ const FRAG = /* glsl */ `
     sky += uSunGlow * (halo * uSunGlowStrength) * (0.55 + 0.45 * horizonBias);
     sky += uSunColor * disc * 1.6;
 
-    // Stars (night only): a fixed pattern quantized on the view sphere so there's
-    // no pole pinch or horizon blow-up, masked to the upper sky, slowly twinkling.
-    if (uStarStrength > 0.001) {
-      vec3 q = floor(dir * 140.0);
-      float s = hash(q.xy + vec2(q.z * 13.1, q.z * 7.7));
-      float star = step(0.984, s) * smoothstep(0.02, 0.22, up);
-      float tw = 0.55 + 0.45 * sin(uTime * 2.0 + s * 100.0);
-      sky += vec3(star * tw * uStarStrength) * vec3(0.9, 0.95, 1.0);
-    }
-
     gl_FragColor = vec4(sky, 1.0);
   }
 `;
-
-function clamp01(v: number): number {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
-}

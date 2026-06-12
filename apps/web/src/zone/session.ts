@@ -60,6 +60,14 @@ import {
 } from '@trace/renderer';
 import { createKeyboardInput, type InputActive, type InputDriver, type TouchControls } from './input';
 import { createCameraInput, type CameraInputDriver } from './camera-input';
+import {
+  createRaceDirector,
+  type RaceDirector,
+  type RaceGateKind,
+  type RaceState,
+  type RaceTrackType,
+} from './race';
+import { loadRiderPoseSet } from '~/lib/rider-pose-store';
 import { createLoop, type Loop } from './loop';
 import { createTelemetryRecorder, type TelemetryMeta, type TelemetrySummary } from './telemetry';
 import {
@@ -71,6 +79,31 @@ import {
 } from './replay';
 
 export type { ReplayState } from './replay';
+export type { RaceState, RaceTrackType, RaceGateKind } from './race';
+
+/**
+ * Dev-Mode Race Builder controls exposed on the session. The React HUD drives
+ * the authored race (gate placement, track type) and the stopwatch through these
+ * — the per-frame race state flows back via {@link SessionInit.onRace}.
+ */
+export type RaceControls = {
+  setTrackType(type: RaceTrackType): void;
+  setLaps(n: number): void;
+  /** Arm click-to-place for a gate; frees the camera until a ground click lands. */
+  beginPlacement(kind: RaceGateKind): void;
+  /** Cancel an armed click-placement and return the camera to the player. */
+  cancelPlacement(): void;
+  /** Drop a gate at the car's current position + heading. */
+  placeAtCar(kind: RaceGateKind): void;
+  /** Standing-start a timed run from the start gate (3-2-1, then time). */
+  startRace(): void;
+  /** Stop a running race now and bank the time. */
+  stopRace(): void;
+  /** Return the car to the start gate and reset the stopwatch. */
+  resetRace(): void;
+  /** Remove all gates and forget the authored race for this zone. */
+  clear(): void;
+};
 
 /**
  * Zone session — one canvas-bound runtime instance per `/play/$zoneId` mount.
@@ -125,6 +158,12 @@ export type SessionInit = {
    * Lets the HUD keep its checkbox in sync with the runtime.
    */
   onSkeleton?: (enabled: boolean) => void;
+  /**
+   * Called with a fresh race-state snapshot whenever the Dev-Mode Race Builder
+   * changes — gate placement, track type, the stopwatch tick, lap/finish. Wired
+   * to the top-right race HUD; undefined for headless setup.
+   */
+  onRace?: (state: RaceState) => void;
   /**
    * Mobile / low-power profile. Caps the device-pixel-ratio and drops to cheaper
    * shadow filtering + no MSAA, the largest fill-rate wins on phone GPUs. The
@@ -210,6 +249,8 @@ export type ZoneSession = {
    * ReplayHandle}, or `null` if nothing has been recorded yet.
    */
   enterReplay(onProgress: (state: ReplayState) => void): ReplayHandle | null;
+  /** Dev-Mode Race Builder controls (gate placement, track type, stopwatch). */
+  readonly race: RaceControls;
   dispose(): void;
 };
 
@@ -223,6 +264,7 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
     onWeather,
     onCameraMode,
     onSkeleton,
+    onRace,
     mobile = false,
   } = init;
 
@@ -323,6 +365,9 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
     // Two-wheeled path: static GLB body + cosmetic lean + posed rider. The
     // physics is still the stable narrow four-wheel rig from the manifest.
     const rider = vehicleManifest.rider;
+    // A pose saved from the dev editor (localStorage, this device) overrides the
+    // default sport tuck as the rider's seated base. Absent → the built-in pose.
+    const savedPoses = loadRiderPoseSet(vehicleManifest.id);
     vehicleVisual = await createBikeVisual({
       url: `${bundleDir}/${vehicleManifest.visual.glb}`,
       manifest: vehicleManifest,
@@ -330,6 +375,7 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       environment: environment.texture,
       riderUrl: rider ? `${bundleDir}/${rider.fbx}` : null,
       fallClipUrl: rider?.fallClip ? `${bundleDir}/${rider.fallClip}` : null,
+      ridePose: savedPoses?.idle ?? null,
     });
   } else if (vehicleManifest.visual?.format === 'glb' && vehicleManifest.visual.glb) {
     vehicleVisual = await createGlbVehicleVisual({
@@ -407,10 +453,16 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   // readout are dev-only, surfaced through the pause-menu "Dev Mode" toggle.
   // Turning dev mode off forces the skeleton overlay off for a clean game view.
   let devModeEnabled = false;
+  // Assigned once the race director exists (created later — it needs the camera
+  // rig). Dev mode drives the gate-visual visibility through this.
+  let applyRaceActive: (on: boolean) => void = () => {
+    /* no-op until the race director is created below */
+  };
   const setDevMode = (on: boolean): void => {
     if (devModeEnabled === on) return;
     devModeEnabled = on;
     if (!on) setSkeleton(false);
+    applyRaceActive(on);
   };
   const onDebugKey = (e: KeyboardEvent): void => {
     // O is a dev shortcut for the skeleton — only meaningful inside dev mode.
@@ -483,6 +535,66 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
   // Input.
   const input: InputDriver = createKeyboardInput();
   const cameraInput: CameraInputDriver = createCameraInput(canvas);
+
+  // ── Dev-Mode Race Builder ──────────────────────────────────────────────────
+  // An in-world race authoring tool (dev only). Drops NFS-style flame gates,
+  // seats a spawn at the start, and runs a stopwatch with crossing/lap detection.
+  // The director owns the gate visuals + race state; the session only feeds it
+  // the car pose each frame, wires the teleport, and routes placement clicks.
+  const raceGroundTargets = (): THREE.Object3D[] => {
+    const targets: THREE.Object3D[] = [];
+    if (zoneVisual) targets.push(zoneVisual.group);
+    if (groundVisual) targets.push(groundVisual.group);
+    if (stuntVisuals) targets.push(stuntVisuals.group);
+    return targets;
+  };
+  const race: RaceDirector = createRaceDirector({
+    scene: sceneBundle.scene,
+    camera: rig.camera,
+    groundTargets: raceGroundTargets,
+    teleport: (s) => {
+      vehicle.reset(s);
+      deformer?.reset();
+    },
+    zoneId: zoneManifest.id,
+    onState: (s) => onRace?.(s),
+  });
+  applyRaceActive = (on) => race.setActive(on);
+  race.setActive(devModeEnabled); // sync now in case dev mode flipped pre-init
+  // Arm/disarm click-placement. While a gate is armed the orbit camera bows out
+  // so a canvas click means "place here" instead of "swing the camera".
+  const setRacePlacing = (kind: RaceGateKind | null): void => {
+    race.armPlacement(kind);
+    cameraInput.setEnabled(race.placing == null);
+  };
+  // Capture-phase so this fires before the camera's own pointer handler; while a
+  // gate is armed we consume the click as a placement raycast.
+  const onRacePlacePointer = (e: PointerEvent): void => {
+    if (!race.placing) return;
+    const rect = canvas.getBoundingClientRect();
+    const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    e.preventDefault();
+    e.stopPropagation();
+    race.placeAtScreen(ndcX, ndcY);
+    // Placed (or, on a miss, still armed): re-enable the camera only once disarmed.
+    if (!race.placing) cameraInput.setEnabled(true);
+  };
+  canvas.addEventListener('pointerdown', onRacePlacePointer, true);
+  const raceControls: RaceControls = {
+    setTrackType: (t) => race.setTrackType(t),
+    setLaps: (n) => race.setLaps(n),
+    beginPlacement: (kind) => setRacePlacing(kind),
+    cancelPlacement: () => setRacePlacing(null),
+    placeAtCar: (kind) => {
+      race.placeAtCar(kind);
+      setRacePlacing(null); // a car-drop also clears any armed click-placement
+    },
+    startRace: () => race.startRace(),
+    stopRace: () => race.stopRace(),
+    resetRace: () => race.resetRace(),
+    clear: () => race.clear(),
+  };
 
   // Dev-mode race telemetry. Records per-step pose + the exact control input fed
   // to the controller, plus chassis contact impacts — opt-in via the dev panel,
@@ -689,6 +801,11 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
       weather.update(elapsed, rig.camera.position);
       vehicle.setGripMultiplier(wetnessToGrip(weather.wetness));
 
+      // Dev-Mode Race Builder: flicker the gate flames + run the stopwatch and
+      // crossing/lap detection off the interpolated car pose. Cheap no-op (just
+      // the early return) when no race is armed and no gates exist.
+      race.update(lerpedSnap, elapsed * 1000);
+
       // Refresh the debug overlay before rendering (it lives in the scene).
       // `debugRender()` is only walked when the overlay is on.
       if (debug.enabled) debug.update(physics.world.debugRender(), vehicle.readDebugFrame());
@@ -826,8 +943,11 @@ export async function startZoneSession(init: SessionInit): Promise<ZoneSession> 
     stopTelemetry: () => telemetry.stop(),
     telemetryCsv: () => telemetry.buildCsv(),
     enterReplay,
+    race: raceControls,
     dispose() {
       loop.stop();
+      canvas.removeEventListener('pointerdown', onRacePlacePointer, true);
+      race.dispose();
       resizeObserver.disconnect();
       window.removeEventListener('keydown', onWeatherKey);
       window.removeEventListener('keydown', onCameraKey);

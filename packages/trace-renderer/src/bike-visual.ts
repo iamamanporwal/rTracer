@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import type { VehicleManifest } from '@trace/core';
 import type { VehicleVisual, VehicleVisualSnapshot } from './vehicle-visual';
-import { createRiderRig, DEFAULT_RIDE_POSE, type RiderRig } from './rider-rig';
+import { createRiderRig, DEFAULT_RIDE_POSE, type RiderPose, type RiderRig } from './rider-rig';
 
 /**
  * Bike visual — the two-wheeled production path (`manifest.class === 'bike'`).
@@ -49,6 +49,12 @@ export type CreateBikeVisualOptions = {
   riderUrl?: string | null;
   /** Absolute URL to a Mixamo falling/knockout clip (FBX). Null → crash() no-ops. */
   fallClipUrl?: string | null;
+  /**
+   * Base riding pose the rider is seated in (the authored idle pose, e.g. a
+   * locally-saved override from the pose editor). Absent → the default sport
+   * tuck. Runtime secondary motion sways on top of this.
+   */
+  ridePose?: RiderPose | null;
 };
 
 // ── Cosmetic lean tuning ─────────────────────────────────────────────────────
@@ -59,6 +65,29 @@ const MAX_LEAN_RAD = 0.62; // ~35°
 const LEAN_SIGN = -1;
 /** Per-frame smoothing toward the target lean (higher = snappier). */
 const LEAN_SMOOTH = 0.18;
+
+// ── Rider secondary motion ("alive, not a statue") ───────────────────────────
+// A spring layer on the torso/neck/head, driven by bike dynamics. Everything is
+// zero at rest, so the static authored pose is unchanged when parked; conservative
+// gains/limits keep hands near the bars. All angles are radians. Tune freely.
+const SPRING_K = 70; // spring stiffness (higher = snappier)
+const SPRING_C = 2 * Math.sqrt(SPRING_K); // critical damping (no oscillation)
+const ACCEL_SMOOTH = 8; // low-pass rate on the derived longitudinal accel
+const ACCEL_CLAMP = 10; // |accel| ceiling fed to the springs (m/s²)
+const CORNER_CLAMP = 8; // |steer·speed| ceiling for the cornering term
+const BREATHE_HZ = 0.25; // idle breathing rate
+const BREATHE_AMP = 0.01; // idle breathing amplitude (spine pitch, rad)
+// gain = rad per input unit; max = DOF clamp (how far the joint may travel).
+const SPINE_PITCH_GAIN = 0.01; // brake → tuck forward, accel → lean back
+const SPINE_PITCH_MAX = 0.13;
+const SPINE_ROLL_GAIN = 0.12; // follow the body lean a touch
+const SPINE_ROLL_MAX = 0.1;
+const HEAD_PITCH_GAIN = 0.005;
+const HEAD_PITCH_MAX = 0.07;
+const HEAD_YAW_GAIN = 0.03; // turn the head into the corner
+const HEAD_YAW_MAX = 0.3;
+const HEAD_ROLL_GAIN = 0.5; // counter the lean so the head stays more upright
+const HEAD_ROLL_MAX = 0.3;
 
 const FORWARD = new THREE.Vector3(0, 0, 1); // chassis-local forward (FORWARD_AXIS=2)
 const RIGHT = new THREE.Vector3(1, 0, 0); // wheel axle (spin axis)
@@ -77,6 +106,7 @@ export async function createBikeVisual(
   options: CreateBikeVisualOptions,
 ): Promise<BikeVisual> {
   const { url, manifest, restHubLocalY, environment, riderUrl, fallClipUrl } = options;
+  const ridePose = options.ridePose ?? DEFAULT_RIDE_POSE;
 
   const loader = new GLTFLoader();
   const gltf = await loader.loadAsync(url);
@@ -162,7 +192,7 @@ export async function createBikeVisual(
   let riderRig: RiderRig | null = null;
   if (riderUrl) {
     try {
-      riderRig = await loadRider(container, manifest, riderUrl);
+      riderRig = await loadRider(container, manifest, riderUrl, ridePose);
       if (fallClipUrl) {
         const rider = container.getObjectByName('bike-rider');
         if (rider) {
@@ -187,6 +217,22 @@ export async function createBikeVisual(
   const steerQuat = new THREE.Quaternion();
   const spinQuat = new THREE.Quaternion();
   let lean = 0; // current smoothed lean angle (rad)
+
+  // Rider secondary-motion springs + the latest inputs they chase (see update()).
+  const mkSpring = (): { x: number; v: number } => ({ x: 0, v: 0 });
+  const rm = {
+    spinePitch: mkSpring(),
+    spineRoll: mkSpring(),
+    headPitch: mkSpring(),
+    headYaw: mkSpring(),
+    headRoll: mkSpring(),
+  };
+  let rmSpeed = 0; // latest signed speed (m/s)
+  let rmSteer = 0; // latest front steer (rad)
+  let rmLean = 0; // latest cosmetic body lean (rad)
+  let rmPrevSpeed = 0;
+  let rmAccel = 0; // smoothed longitudinal accel (m/s²)
+  let rmBreathe = 0; // breathing phase (s)
 
   function applySnapshot(snapshot: VehicleVisualSnapshot): void {
     container.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
@@ -227,10 +273,60 @@ export async function createBikeVisual(
       wheelFront.quaternion.copy(steerQuat).multiply(spinQuat);
     }
     if (wheelRear) wheelRear.quaternion.setFromAxisAngle(RIGHT, snapshot.wheels[2]?.rotation ?? 0);
+
+    // Latch the inputs the rider secondary motion reacts to (advanced in update()).
+    rmSpeed = speed;
+    rmSteer = steer;
+    rmLean = lean;
   }
 
   function update(dt: number): void {
     if (mixer) mixer.update(dt);
+    if (riderRig) updateRiderMotion(riderRig, dt);
+  }
+
+  /** One spring step toward `target` (critically damped; alloc-free). */
+  function spring(s: { x: number; v: number }, target: number, d: number): void {
+    s.v += (SPRING_K * (target - s.x) - SPRING_C * s.v) * d;
+    s.x += s.v * d;
+  }
+
+  /**
+   * Drive the rider's torso/neck/head from bike dynamics so it reads as alive:
+   * brake/accel tucks or leans the torso, cornering turns the head into the turn,
+   * the head counters the body lean to stay upright, plus a faint idle breath.
+   * All within DOF clamps and zero at rest.
+   */
+  function updateRiderMotion(rig: RiderRig, dt: number): void {
+    const d = Math.min(Math.max(dt, 0), 1 / 30); // clamp for spring stability
+    const rawAccel = d > 0 ? (rmSpeed - rmPrevSpeed) / d : 0;
+    rmPrevSpeed = rmSpeed;
+    rmAccel += (rawAccel - rmAccel) * Math.min(1, d * ACCEL_SMOOTH);
+    rmBreathe += d;
+
+    const aLong = clamp(rmAccel, -ACCEL_CLAMP, ACCEL_CLAMP);
+    const corner = clamp(rmSteer * rmSpeed, -CORNER_CLAMP, CORNER_CLAMP);
+    const breathe = Math.sin(rmBreathe * BREATHE_HZ * Math.PI * 2) * BREATHE_AMP;
+
+    const spinePitchT =
+      clamp(-aLong * SPINE_PITCH_GAIN, -SPINE_PITCH_MAX, SPINE_PITCH_MAX) + breathe;
+    const spineRollT = clamp(rmLean * SPINE_ROLL_GAIN, -SPINE_ROLL_MAX, SPINE_ROLL_MAX);
+    const headPitchT = clamp(aLong * HEAD_PITCH_GAIN, -HEAD_PITCH_MAX, HEAD_PITCH_MAX);
+    const headYawT = clamp(corner * HEAD_YAW_GAIN, -HEAD_YAW_MAX, HEAD_YAW_MAX);
+    const headRollT = clamp(-rmLean * HEAD_ROLL_GAIN, -HEAD_ROLL_MAX, HEAD_ROLL_MAX);
+
+    spring(rm.spinePitch, spinePitchT, d);
+    spring(rm.spineRoll, spineRollT, d);
+    spring(rm.headPitch, headPitchT, d);
+    spring(rm.headYaw, headYawT, d);
+    spring(rm.headRoll, headRollT, d);
+
+    rig.applySpineOffsets({
+      spine: [rm.spinePitch.x, 0, rm.spineRoll.x],
+      spine1: [rm.spinePitch.x * 0.5, 0, rm.spineRoll.x * 0.5],
+      neck: [rm.headPitch.x * 0.4, rm.headYaw.x * 0.4, 0],
+      head: [rm.headPitch.x * 0.6, rm.headYaw.x * 0.6, rm.headRoll.x],
+    });
   }
 
   function crash(): void {
@@ -260,11 +356,12 @@ export async function createBikeVisual(
   return { group: container, applySnapshot, update, crash, dispose, riderRig };
 }
 
-/** Load the rider FBX, build a {@link RiderRig}, and pose it into the sport tuck. */
+/** Load the rider FBX, build a {@link RiderRig}, and pose it into `basePose`. */
 async function loadRider(
   container: THREE.Group,
   manifest: VehicleManifest,
   riderUrl: string,
+  basePose: RiderPose,
 ): Promise<RiderRig> {
   const fbx = await new FBXLoader().loadAsync(riderUrl);
   const rider = fbx as unknown as THREE.Group;
@@ -272,9 +369,8 @@ async function loadRider(
   rider.scale.setScalar(manifest.rider?.scale ?? 0.01);
   // The rig discovers the (possibly multiple) skeletons, parents the rider, and
   // measures the seat + grip hardpoints; applyPose then solves the IK.
-  // DEFAULT_RIDE_POSE reproduces the original hand-tuned sport posture exactly.
   const rig = createRiderRig({ rider, container, manifest });
-  rig.applyPose(DEFAULT_RIDE_POSE);
+  rig.applyPose(basePose);
   return rig;
 }
 

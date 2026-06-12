@@ -1,30 +1,31 @@
 import * as THREE from 'three';
 
 /**
- * Volumetric-looking billboard cloud field, built from a couple of source PNGs.
+ * Realistic billboard cloud field, built from the source PNGs.
  *
- * The old sky dome painted clouds by spherically projecting a procedural blob
- * texture and hard-thresholding it. That projection sliced clouds along the
- * horizon taper (the "cut in the middle") and pinched them at the zenith. This
- * replaces that approach with discrete, soft-edged sprites floating in real 3D —
- * so a cloud is never cut: it's a stamp with its own alpha, sorted and blended
- * like any other transparent object.
+ * The old sky dome painted clouds by spherically projecting a blob texture and
+ * thresholding it — that sliced clouds along the horizon (the "cut") and pinched
+ * them at the zenith. Clouds now live here as discrete soft-edged sprites in real
+ * 3D, so a cloud is never cut.
  *
- * **Making many clouds from two images (simple algos).** At init we bake a
- * handful of distinct cloud *stamps* from each source by cropping a sub-region,
- * randomly mirroring it, rotating it a few degrees, and keying out the
- * background to alpha. One big cumulus photo yields many believable smaller
- * clouds this way; mirror + rotation keep repeats from reading as repeats. Two
- * source images (a bold silhouette + a soft puff) give a cumulus/wisp mix.
+ * **Making real clouds from the images (the "brush" trick).** A flat crop of a
+ * cloud photo stamped on a quad reads as a fake paper cut-out — hard rim, no
+ * body. Instead we treat each source as a *brush*: at init we key its background
+ * out to alpha once, then bake a set of cloud *stamps* by dabbing the brush
+ * several times at random offsets, scales, rotations and opacities. Overlapping
+ * soft dabs build a lumpy cloud with a dense core, ragged edges and real internal
+ * shading — and every stamp is unique. The soft photo (`cloud-b`) carries the
+ * realistic detail; the silhouette (`cloud-a`), heavily blurred, adds soft body
+ * mass. A radial feather guarantees the rim fades (no rectangle), and a faint
+ * underside darken fakes a shadowed base so the billboard reads as volume.
  *
  * **Infinite, drifting, no seam.** The field is a flat slab of sky centred on
  * the camera every frame (so it always surrounds the player). Each sprite drifts
- * with a global wind and wraps within the slab; sprites near the slab edge fade
- * out, so the wrap never pops. Pure scalar math per frame, zero allocations.
+ * with a global wind and wraps within the slab; sprites near the edge fade out,
+ * so the wrap never pops. Pure scalar math per frame, zero allocations.
  *
  * **Weather-driven.** Coverage gates how many sprites show (scattered → overcast)
- * and a single tint recolours them all (white → storm-grey → golden). Nothing
- * here hardcodes a palette; the weather system pushes both live.
+ * and a single tint recolours them all (white → storm-grey → golden).
  */
 
 // Half-width of the cloud slab (m). The camera sits at the slab centre every
@@ -32,24 +33,32 @@ import * as THREE from 'three';
 const FIELD = 1100;
 // Altitude band for the slab. Low enough to read as a believable ceiling, high
 // enough that a cloud directly overhead never clips the camera near-plane.
-const H_MIN = 140;
-const H_MAX = 340;
-// Distinct stamps baked per source image (mirror/rotate/crop variations).
-const STAMPS_PER_SOURCE = 4;
-// Resolution of each baked stamp. 256² is plenty for a soft cloud and cheap to
-// upload; sprites are far away so they never fill many pixels.
-const STAMP_RES = 256;
+const H_MIN = 150;
+const H_MAX = 360;
+// Distinct cloud stamps baked at init (each a unique composite of brush dabs).
+const STAMP_COUNT = 8;
+// Resolution of each baked stamp. Clouds can fill a good chunk of screen, so 512
+// keeps edges crisp; it's a one-time bake of a handful of textures.
+const STAMP_RES = 512;
+// Fit box (px) a source brush is scaled into before dabbing.
+const BRUSH_BOX = 300;
 
 /**
- * A source cloud image and how to extract its alpha.
- * - `bright`: cloud is the bright part on a dark background (white-on-black
- *   silhouette) → alpha is luminance, colour forced white so it tints cleanly.
+ * A source cloud image + how to key its background to alpha + how much to blur
+ * it into a brush.
  * - `dark`: cloud is darker than a white background (a soft photo) → alpha is
  *   distance-from-white, original shading kept for a realistic look.
+ * - `bright`: cloud is the bright part on a dark background (a silhouette) →
+ *   alpha is luminance, colour forced white. Blurred hard so it reads as soft
+ *   body mass rather than a crisp cut-out.
  */
 export type CloudSource = {
   url: string;
   key: 'bright' | 'dark';
+  /** Source blur (px) before keying — softens hard silhouettes into puffs. */
+  blurPx: number;
+  /** Relative chance this brush is chosen for a dab. */
+  weight: number;
 };
 
 export type CloudFieldOptions = {
@@ -74,11 +83,14 @@ export type CloudFieldHandle = {
 };
 
 const DEFAULT_SOURCES: readonly CloudSource[] = [
-  { url: '/assets/sky/cloud-a.png', key: 'bright' },
-  { url: '/assets/sky/cloud-b.png', key: 'dark' },
+  // The realistic soft photo is the primary detail brush.
+  { url: '/assets/sky/cloud-b.png', key: 'dark', blurPx: 2, weight: 3 },
+  // The silhouette, blurred hard, is soft filler body underneath the detail.
+  { url: '/assets/sky/cloud-a.png', key: 'bright', blurPx: 8, weight: 1 },
 ];
 
-type CloudVariant = { texture: THREE.Texture; key: 'bright' | 'dark' };
+type Brush = { canvas: HTMLCanvasElement; w: number; h: number; weight: number };
+type CloudVariant = { texture: THREE.Texture };
 
 /**
  * Build the cloud field. Sprites materialise asynchronously once the source
@@ -127,8 +139,8 @@ export function createCloudField(
   const variants: CloudVariant[] = [];
 
   // Gentle wind in a fixed direction (m/s) — slow enough to read as drift.
-  const windX = 4.5;
-  const windZ = 2.0;
+  const windX = 3.5;
+  const windZ = 1.5;
 
   const tint = new THREE.Color('#ffffff');
   let coverage = 0.4;
@@ -162,14 +174,13 @@ export function createCloudField(
 
       // Big low cumulus → smaller high wisps. Generous because the rim feather
       // trims the visible silhouette well inside the sprite quad.
-      const size = (320 - 170 * hi) * (0.85 + Math.random() * 0.5);
-      const aspect = 0.46 + Math.random() * 0.16; // clouds are wide and flat
-      baseOpacity[i] = (0.92 - 0.5 * hi) * (0.82 + Math.random() * 0.3);
-      brightness[i] = 0.86 + Math.random() * 0.14;
+      const size = (360 - 200 * hi) * (0.8 + Math.random() * 0.55);
+      const aspect = 0.5 + Math.random() * 0.16; // clouds are wider than tall
+      baseOpacity[i] = (0.95 - 0.45 * hi) * (0.85 + Math.random() * 0.25);
+      brightness[i] = 0.88 + Math.random() * 0.12;
       rank[i] = Math.random();
 
-      // Low clouds prefer the bold silhouette; high wisps the soft photo.
-      const variant = pickVariant(variants, hi < 0.5 ? 'bright' : 'dark');
+      const variant = variants[(Math.random() * variants.length) | 0]!;
       const material = new THREE.SpriteMaterial({
         map: variant.texture,
         transparent: true,
@@ -177,7 +188,7 @@ export function createCloudField(
         fog: false,
         toneMapped: false,
         opacity: 0,
-        rotation: (Math.random() * 2 - 1) * 0.14, // near-level, slight tilt
+        rotation: (Math.random() * 2 - 1) * 0.1, // near-level, slight tilt
       });
       const sprite = new THREE.Sprite(material);
       sprite.scale.set(size, size * aspect, 1);
@@ -256,7 +267,7 @@ export function createCloudField(
 
 // ── Stamp baking ─────────────────────────────────────────────────────────────
 
-/** Load every source, bake its stamps, and collect the resulting textures. */
+/** Load every source, prep it into a brush, and bake the composite stamps. */
 async function loadVariants(
   sources: readonly CloudSource[],
 ): Promise<CloudVariant[]> {
@@ -267,79 +278,86 @@ async function loadVariants(
         .catch(() => null),
     ),
   );
-  const variants: CloudVariant[] = [];
+  const brushes: Brush[] = [];
   for (const entry of loaded) {
     if (!entry) continue;
-    for (let k = 0; k < STAMPS_PER_SOURCE; k++) {
-      const texture = bakeStamp(entry.img, entry.src.key);
-      if (texture) variants.push({ texture, key: entry.src.key });
-    }
+    const brush = prepBrush(entry.img, entry.src);
+    if (brush) brushes.push(brush);
+  }
+  if (brushes.length === 0) return [];
+
+  const variants: CloudVariant[] = [];
+  for (let k = 0; k < STAMP_COUNT; k++) {
+    const texture = bakeStamp(brushes);
+    if (texture) variants.push({ texture });
   }
   return variants;
 }
 
 /**
- * Bake one cloud stamp: crop a sub-region of the source that's guaranteed to
- * include its centre (where the cloud lives), draw it mirrored/rotated into a
- * square canvas, key the background out to alpha, then feather the rim.
- *
- * The feather is what kills the "cut": the source images are a single cloud that
- * fills the frame, so any sub-crop slices through the cloud body and leaves it
- * meeting the crop's straight edge. Fading alpha toward the stamp border turns
- * that hard edge into a soft puff — and softens every cloud's silhouette while
- * we're at it. A gentle vertical darken on the bright (silhouette) source fakes a
- * shadowed underside so the billboards read as volume, not paper cut-outs.
+ * Turn a source image into a reusable brush: scale it into a fit box, blur it,
+ * and key its background out to alpha so it can be dabbed with normal alpha
+ * compositing. Returns a canvas + its drawn size.
  */
-function bakeStamp(img: HTMLImageElement, key: 'bright' | 'dark'): THREE.Texture | null {
+function prepBrush(img: HTMLImageElement, src: CloudSource): Brush | null {
+  const fit = Math.min(BRUSH_BOX / img.width, BRUSH_BOX / img.height);
+  const w = Math.max(1, Math.round(img.width * fit));
+  const h = Math.max(1, Math.round(img.height * fit));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  // The white-background photo must key against white; prime it so the keyed
+  // result has a transparent border (not an opaque black box). The silhouette
+  // keys against transparent black.
+  if (src.key === 'dark') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+  }
+  if (src.blurPx > 0) ctx.filter = `blur(${src.blurPx}px)`;
+  ctx.drawImage(img, 0, 0, w, h);
+  ctx.filter = 'none';
+
+  const image = ctx.getImageData(0, 0, w, h);
+  applyCloudKey(image.data, src.key);
+  ctx.putImageData(image, 0, 0);
+  return { canvas, w, h, weight: src.weight };
+}
+
+/**
+ * Bake one cloud stamp by dabbing brushes several times into a square canvas —
+ * a dense, lumpy core that fades to ragged edges — then radial-feather + shade.
+ */
+function bakeStamp(brushes: Brush[]): THREE.Texture | null {
   const canvas = document.createElement('canvas');
   canvas.width = STAMP_RES;
   canvas.height = STAMP_RES;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
+  ctx.clearRect(0, 0, STAMP_RES, STAMP_RES);
 
-  // For the white-background source, prime the canvas white so any transparent
-  // border in the PNG keys out (distance-from-white → 0) rather than reading as
-  // an opaque black blob. The dark-background source primes transparent.
-  if (key === 'dark') {
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, STAMP_RES, STAMP_RES);
-  } else {
-    ctx.clearRect(0, 0, STAMP_RES, STAMP_RES);
+  const dabs = 5 + ((Math.random() * 4) | 0); // 5–8 dabs per cloud
+  for (let d = 0; d < dabs; d++) {
+    const brush = pickBrush(brushes);
+    // Keep dab centres in the middle, spread wider horizontally than vertically
+    // so the composite reads as a wide cloud with a flattish base.
+    const cx = STAMP_RES * (0.5 + (Math.random() - 0.5) * 0.46);
+    const cy = STAMP_RES * (0.5 + (Math.random() - 0.5) * 0.26);
+    const dw = STAMP_RES * (0.4 + Math.random() * 0.34);
+    const dh = (dw * brush.h) / brush.w;
+    ctx.save();
+    ctx.globalAlpha = 0.55 + Math.random() * 0.4;
+    ctx.translate(cx, cy);
+    ctx.rotate((Math.random() * 2 - 1) * 0.5);
+    ctx.scale(Math.random() < 0.5 ? -1 : 1, 1); // random mirror
+    ctx.drawImage(brush.canvas, -dw / 2, -dh / 2, dw, dh);
+    ctx.restore();
   }
 
-  const iw = img.width;
-  const ih = img.height;
-  // Crop 55–90% of each axis, positioned so the source centre stays inside the
-  // crop — the cloud occupies the middle of both source images, so this keeps
-  // every stamp non-empty while still yielding distinct shapes.
-  const cropW = iw * (0.55 + Math.random() * 0.35);
-  const cropH = ih * (0.55 + Math.random() * 0.35);
-  const cropX = clamp(iw * 0.5 - cropW * (0.3 + Math.random() * 0.4), 0, iw - cropW);
-  const cropY = clamp(ih * 0.5 - cropH * (0.3 + Math.random() * 0.4), 0, ih - cropH);
-
-  // Draw the crop preserving its aspect (fit inside the inner box), mirrored and
-  // slightly rotated. Padding + the rim feather below mean a rotated draw poking
-  // past the box just fades out — never a hard clip.
-  const pad = 0.82;
-  const box = STAMP_RES * pad;
-  const fit = Math.min(box / cropW, box / cropH);
-  const dw = cropW * fit;
-  const dh = cropH * fit;
-  ctx.save();
-  ctx.translate(STAMP_RES / 2, STAMP_RES / 2);
-  ctx.rotate((Math.random() * 2 - 1) * 0.4); // ±~23°
-  ctx.scale(Math.random() < 0.5 ? -1 : 1, 1); // random mirror
-  // Blur the source before keying. The silhouette PNG has hard, jagged edges; a
-  // little blur turns them into soft puffy gradients (and bleeds the edge out a
-  // touch for a fuller cloud). The photo source needs only a hair of smoothing.
-  ctx.filter = key === 'bright' ? 'blur(3.5px)' : 'blur(1.5px)';
-  ctx.drawImage(img, cropX, cropY, cropW, cropH, -dw / 2, -dh / 2, dw, dh);
-  ctx.filter = 'none';
-  ctx.restore();
-
   const image = ctx.getImageData(0, 0, STAMP_RES, STAMP_RES);
-  applyCloudKey(image.data, key);
-  featherStamp(image.data, STAMP_RES, STAMP_RES, key);
+  featherStamp(image.data, STAMP_RES, STAMP_RES);
   ctx.putImageData(image, 0, 0);
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -353,15 +371,14 @@ function bakeStamp(img: HTMLImageElement, key: 'bright' | 'dark'): THREE.Texture
 }
 
 /**
- * Key a cloud image to alpha in place (RGBA, non-premultiplied).
- *
- * Pure pixel math — no DOM — so it's unit-testable in Node. Exported for that.
+ * Key a cloud image to alpha in place (RGBA, non-premultiplied). Pure pixel math
+ * (no DOM) so it's unit-testable in Node. Exported for that.
  *
  * - `bright`: alpha = luminance (the cloud is the bright part), colour forced to
  *   white so a sprite tint multiplies cleanly to any weather palette.
  * - `dark`: alpha = distance from white, with a small dead-zone so a near-white
- *   background keys fully out and a gain that lifts the cloud body to opaque;
- *   the original shading is kept (and nudged brighter) for a realistic look.
+ *   background keys fully out and a gain that lifts the cloud body to opaque; the
+ *   original shading is kept (and nudged brighter) for a realistic look.
  */
 export function applyCloudKey(data: Uint8ClampedArray, key: 'bright' | 'dark'): void {
   for (let i = 0; i < data.length; i += 4) {
@@ -377,48 +394,39 @@ export function applyCloudKey(data: Uint8ClampedArray, key: 'bright' | 'dark'): 
     } else {
       const whiteness = Math.min(r, g, b) / 255; // 1 on a pure-white background
       const a = clamp01((1 - whiteness - 0.02) * 3);
-      data[i] = Math.min(255, r + 30);
-      data[i + 1] = Math.min(255, g + 30);
-      data[i + 2] = Math.min(255, b + 30);
+      data[i] = Math.min(255, r + 36);
+      data[i + 1] = Math.min(255, g + 36);
+      data[i + 2] = Math.min(255, b + 36);
       data[i + 3] = Math.round(a * 255);
     }
   }
 }
 
 /**
- * Feather a baked stamp's alpha toward its rim and (for `bright` clouds) shade
- * the underside. Pure pixel math over an RGBA buffer of `w`×`h` — DOM-free, so
- * it's unit-testable in Node. Exported for that.
+ * Radial-feather a baked stamp's alpha and shade its underside. Pure pixel math
+ * over an RGBA buffer of `w`×`h` — DOM-free, so it's unit-testable in Node.
  *
- * - **Rim feather:** alpha is multiplied by a smooth window that reaches 0 at the
- *   border, so a cropped cloud fades out instead of ending on a hard straight
- *   edge (the "cut"). Applied per-axis so corners feather twice (rounder puffs).
- * - **Underside shade (bright only):** the lower half of the stamp is darkened a
- *   touch, faking a shadowed cloud base for a sense of volume. Skipped for `dark`
- *   clouds, whose source photo already carries real shading.
+ * - **Radial feather:** alpha is multiplied by a smooth window that reaches 0 at
+ *   the rim, computed from the *circular* distance to the centre. A square
+ *   (per-axis) window leaves a faint rectangle around the cloud; a radial one
+ *   doesn't, and the sprite's wide aspect stretches the circle into a believable
+ *   wide ellipse.
+ * - **Underside shade:** the lower half is darkened a touch, faking a shadowed
+ *   cloud base so the flat billboard reads as volume.
  */
-export function featherStamp(
-  data: Uint8ClampedArray,
-  w: number,
-  h: number,
-  key: 'bright' | 'dark',
-): void {
+export function featherStamp(data: Uint8ClampedArray, w: number, h: number): void {
   for (let y = 0; y < h; y++) {
-    // ny ∈ [-1, 1] across the stamp height; 0 = centre.
-    const ny = (y / (h - 1)) * 2 - 1;
-    const winY = 1 - smoothstep(0.62, 0.98, Math.abs(ny));
-    // Underside (bottom half) darken for bright silhouettes only.
-    const shade = key === 'bright' ? 1 - 0.22 * smoothstep(0.0, 1.0, ny) : 1;
+    const ny = (y / (h - 1)) * 2 - 1; // [-1, 1], 0 = centre
+    const shade = 1 - 0.18 * smoothstep(0.0, 1.0, ny); // darker toward the base
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
       const nx = (x / (w - 1)) * 2 - 1;
-      const winX = 1 - smoothstep(0.62, 0.98, Math.abs(nx));
-      data[i + 3] = Math.round(data[i + 3]! * winX * winY);
-      if (shade !== 1) {
-        data[i] = Math.round(data[i]! * shade);
-        data[i + 1] = Math.round(data[i + 1]! * shade);
-        data[i + 2] = Math.round(data[i + 2]! * shade);
-      }
+      const r = Math.sqrt(nx * nx + ny * ny);
+      const win = 1 - smoothstep(0.62, 1.0, r);
+      data[i + 3] = Math.round(data[i + 3]! * win);
+      data[i] = Math.round(data[i]! * shade);
+      data[i + 1] = Math.round(data[i + 1]! * shade);
+      data[i + 2] = Math.round(data[i + 2]! * shade);
     }
   }
 }
@@ -435,30 +443,28 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-/** Pick a variant matching `key` if any were baked, else any variant. */
-function pickVariant(variants: CloudVariant[], key: 'bright' | 'dark'): CloudVariant {
-  let matchCount = 0;
-  for (const v of variants) if (v.key === key) matchCount++;
-  if (matchCount === 0) return variants[(Math.random() * variants.length) | 0]!;
-  let pick = (Math.random() * matchCount) | 0;
-  for (const v of variants) {
-    if (v.key !== key) continue;
-    if (pick === 0) return v;
-    pick--;
+/** Pick a brush weighted by its `weight` (the detail photo dabs more often). */
+function pickBrush(brushes: Brush[]): Brush {
+  let total = 0;
+  for (const b of brushes) total += b.weight;
+  let r = Math.random() * total;
+  for (const b of brushes) {
+    r -= b.weight;
+    if (r <= 0) return b;
   }
-  return variants[0]!;
+  return brushes[brushes.length - 1]!;
 }
 
 function pickCloudCount(max?: number): number {
-  const cap = max ?? 46;
-  if (typeof navigator === 'undefined') return Math.min(24, cap);
+  const cap = max ?? 28;
+  if (typeof navigator === 'undefined') return Math.min(16, cap);
   const isMobile =
     /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
     (navigator.maxTouchPoints ?? 0) > 1;
-  if (isMobile) return Math.min(16, cap);
+  if (isMobile) return Math.min(12, cap);
   const cores = navigator.hardwareConcurrency ?? 4;
-  if (cores >= 8) return Math.min(46, cap);
-  return Math.min(30, cap);
+  if (cores >= 8) return Math.min(28, cap);
+  return Math.min(20, cap);
 }
 
 /** Map `v` into the symmetric range [-half, half) — the slab wrap. */
@@ -473,10 +479,6 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
   if (edge0 === edge1) return x < edge0 ? 0 : 1;
   const t = clamp01((x - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
 }
 
 function clamp01(v: number): number {

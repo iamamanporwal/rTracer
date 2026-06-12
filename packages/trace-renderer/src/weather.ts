@@ -44,8 +44,6 @@ export type WeatherPreset = {
   sunGlowColor: `#${string}`;
   /** 0..~1.5 — sun-halo intensity. 0 hides the sun (overcast/storm). */
   sunGlowStrength: number;
-  /** 0..1 — night star field intensity. */
-  starStrength: number;
   /** Sun direction before normalization; a low vector reads as a low sun. */
   sunDirection: [number, number, number];
   ambientSky: `#${string}`;
@@ -73,7 +71,6 @@ export const WEATHER_PRESETS: readonly WeatherPreset[] = [
     sunIntensity: 2.2,
     sunGlowColor: '#ffe9b0',
     sunGlowStrength: 0.55,
-    starStrength: 0,
     sunDirection: [-0.6, 1, 0.4],
     ambientSky: '#7ab0d8',
     ambientGround: '#3a2a1a',
@@ -95,7 +92,6 @@ export const WEATHER_PRESETS: readonly WeatherPreset[] = [
     sunIntensity: 0.9,
     sunGlowColor: '#c8ccd2',
     sunGlowStrength: 0.12,
-    starStrength: 0,
     sunDirection: [-0.3, 1, 0.2],
     ambientSky: '#b3bcc4',
     ambientGround: '#4a4640',
@@ -119,7 +115,6 @@ export const WEATHER_PRESETS: readonly WeatherPreset[] = [
     sunIntensity: 2.7,
     sunGlowColor: '#ff7a30',
     sunGlowStrength: 1.35,
-    starStrength: 0,
     sunDirection: [-0.92, 0.18, 0.32],
     ambientSky: '#caa07a',
     ambientGround: '#2a1d12',
@@ -141,7 +136,6 @@ export const WEATHER_PRESETS: readonly WeatherPreset[] = [
     sunIntensity: 0.5,
     sunGlowColor: '#46588c',
     sunGlowStrength: 0.5,
-    starStrength: 1.0,
     sunDirection: [-0.4, 0.9, -0.3],
     ambientSky: '#26324d',
     ambientGround: '#0a0c12',
@@ -163,7 +157,6 @@ export const WEATHER_PRESETS: readonly WeatherPreset[] = [
     sunIntensity: 0.6,
     sunGlowColor: '#4a525c',
     sunGlowStrength: 0.08,
-    starStrength: 0,
     sunDirection: [-0.5, 0.85, 0.15],
     ambientSky: '#525a64',
     ambientGround: '#1a1d22',
@@ -217,7 +210,6 @@ export function createWeatherSystem(opts: CreateWeatherSystemOptions): WeatherSy
     sunGlow: '#000000',
     sunGlowStrength: 0,
     sunDir: [0, 1, 0],
-    starStrength: 0,
   };
 
   let current: WeatherPreset = WEATHER_PRESETS[clampIndex(initialIndex)]!;
@@ -249,7 +241,7 @@ export function createWeatherSystem(opts: CreateWeatherSystemOptions): WeatherSy
     if (scene.background instanceof THREE.Color) scene.background.set(next.skyHorizon);
     else scene.background = new THREE.Color(next.skyHorizon);
 
-    // Sky dome — gradient + sun (aligned to the directional light) + stars.
+    // Sky dome — gradient + sun (aligned to the directional light).
     tint.zenith = next.skyTop;
     tint.mid = next.skyMid;
     tint.horizon = next.skyHorizon;
@@ -259,7 +251,6 @@ export function createWeatherSystem(opts: CreateWeatherSystemOptions): WeatherSy
     tint.sunDir[0] = next.sunDirection[0];
     tint.sunDir[1] = next.sunDirection[1];
     tint.sunDir[2] = next.sunDirection[2];
-    tint.starStrength = next.starStrength;
     sky.setTint(tint);
 
     // Cloud billboards — recolour + set coverage.

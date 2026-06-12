@@ -49,7 +49,7 @@ export type TireFx = {
    * consecutive contact-point deltas otherwise produce a zig-zag.
    */
   update(
-    wheels: ReadonlyArray<WheelSlipFrame>,
+    wheels: readonly WheelSlipFrame[],
     dt: number,
     cameraPos: THREE.Vector3,
     chassisRotation: { x: number; y: number; z: number; w: number },
@@ -311,13 +311,13 @@ export function createTireFx(options: CreateTireFxOptions): TireFx {
   const EMIT_PER_SEC = 72;
 
   function update(
-    wheels: ReadonlyArray<WheelSlipFrame>,
+    wheels: readonly WheelSlipFrame[],
     dt: number,
     cameraPos: THREE.Vector3,
     chassisRotation: { x: number; y: number; z: number; w: number },
   ): void {
     elapsed += Math.max(dt, 0);
-    smokeMaterial.uniforms['uTime']!.value = elapsed;
+    smokeMaterial.uniforms.uTime!.value = elapsed;
 
     // Chassis +X projected onto the ground plane = the lateral band direction
     // for every wheel on this car. Rotating the canonical (1,0,0) by the

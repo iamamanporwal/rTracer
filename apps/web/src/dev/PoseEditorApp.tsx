@@ -14,7 +14,13 @@
  * URL params: `?v=vehicle_jawa&hub=-0.179` (hub defaults per bike).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { RIDER_POSE_NAMES, type RiderPose, type RiderPoseName } from '@trace/renderer';
+import {
+  RIDER_POSE_NAMES,
+  type RiderPose,
+  type RiderPoseName,
+  type RiderPoseSet,
+} from '@trace/renderer';
+import { loadRiderPoseSet, saveRiderPoseSet } from '~/lib/rider-pose-store';
 import {
   createPoseEditorEngine,
   defaultHub,
@@ -38,6 +44,7 @@ export function PoseEditorApp(): JSX.Element {
   const [state, setState] = useState<EditorState | null>(null);
   const [io, setIo] = useState<'none' | 'export' | 'import'>('none');
   const [ioText, setIoText] = useState('');
+  const [savedAt, setSavedAt] = useState(0); // bumps on save → shows the "saved" flash
 
   const { vehicleId, hub } = useMemo(() => {
     const p = new URLSearchParams(location.search);
@@ -50,8 +57,18 @@ export function PoseEditorApp(): JSX.Element {
     const engine = createPoseEditorEngine({ canvas: canvasRef.current, vehicleId, hub });
     engineRef.current = engine;
     engine.onChange(setState);
+    // Re-open with whatever was last saved for this bike (local override).
+    const saved = loadRiderPoseSet(vehicleId);
+    if (saved) engine.loadPoseSet(saved);
     return () => engine.dispose();
   }, [vehicleId, hub]);
+
+  const saveToGame = (): void => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    saveRiderPoseSet(vehicleId, JSON.parse(engine.poseSetJson()) as RiderPoseSet);
+    setSavedAt(Date.now());
+  };
 
   const engine = engineRef.current;
   const selected = state ? TARGET_LIST.find((t) => t.id === state.target) ?? TARGET_LIST[0] : null;
@@ -84,11 +101,12 @@ export function PoseEditorApp(): JSX.Element {
 
       {/* Bottom-left hint */}
       <div className="pointer-events-none absolute bottom-3 left-3 z-10 max-w-md font-mono text-[11px] leading-relaxed text-mw-muted [text-shadow:0_1px_2px_#000]">
-        orbit: drag empty space · move the active target with its gizmo · elbows/knees: drag to aim the bend
+        orbit: drag empty space · click a joint dot to select it · drag its gizmo to move · Save to use it in-game
       </div>
 
       {/* Panel */}
-      <div className="absolute right-0 top-0 z-20 flex h-full w-[340px] flex-col gap-4 overflow-y-auto border-l border-mw-edge/60 bg-mw-panel/95 p-4 backdrop-blur-md">
+      <div className="absolute right-0 top-0 z-20 flex h-full w-[340px] flex-col border-l border-mw-edge/60 bg-mw-panel/95 backdrop-blur-md">
+        <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-mw-accent">
             Rider Pose Editor
@@ -200,6 +218,25 @@ export function PoseEditorApp(): JSX.Element {
             </div>
           </Section>
         )}
+        </div>
+
+        {/* Save footer — bottom-right, always visible. Persists the pose set to
+            this bike (localStorage) so the running game uses it immediately. */}
+        <div className="shrink-0 border-t border-mw-edge/60 bg-mw-panel p-3">
+          <button
+            type="button"
+            onClick={saveToGame}
+            disabled={!state?.hasRider}
+            className="w-full rounded bg-mw-accent px-3 py-2.5 font-display text-sm font-bold uppercase tracking-[0.15em] text-mw-bg transition-colors hover:bg-mw-accent/90 active:scale-[0.99] disabled:opacity-40"
+          >
+            Save to this bike
+          </button>
+          <div className="mt-1 text-center font-mono text-[10px] text-mw-muted">
+            {savedAt > 0
+              ? 'saved ✓ — ride this bike to see it'
+              : 'stores locally; used in-game on this device'}
+          </div>
+        </div>
       </div>
     </div>
   );

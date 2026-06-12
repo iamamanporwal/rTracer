@@ -68,17 +68,24 @@ export type PoseEditorEngine = {
   dispose(): void;
 };
 
-/** TargetId → the pose field it writes, plus (for poles) the joint it pivots from. */
-const TARGETS: Record<TargetId, { field: VecField; kind: 'pos' | 'pole'; rootBone?: string }> = {
+/**
+ * TargetId → the pose field it writes. Poles (elbow/knee) sit ON the mid joint
+ * (`midBone`) and the dragged direction is measured from the chain root
+ * (`rootBone`), so the indicator lives on the actual elbow/knee, not in mid-air.
+ */
+const TARGETS: Record<
+  TargetId,
+  { field: VecField; kind: 'pos' | 'pole'; rootBone?: string; midBone?: string }
+> = {
   hips: { field: 'hips', kind: 'pos' },
   gripL: { field: 'gripL', kind: 'pos' },
   gripR: { field: 'gripR', kind: 'pos' },
   pegL: { field: 'pegL', kind: 'pos' },
   pegR: { field: 'pegR', kind: 'pos' },
-  elbowL: { field: 'armPoleL', kind: 'pole', rootBone: 'leftarm' },
-  elbowR: { field: 'armPoleR', kind: 'pole', rootBone: 'rightarm' },
-  kneeL: { field: 'legPoleL', kind: 'pole', rootBone: 'leftupleg' },
-  kneeR: { field: 'legPoleR', kind: 'pole', rootBone: 'rightupleg' },
+  elbowL: { field: 'armPoleL', kind: 'pole', rootBone: 'leftarm', midBone: 'leftforearm' },
+  elbowR: { field: 'armPoleR', kind: 'pole', rootBone: 'rightarm', midBone: 'rightforearm' },
+  kneeL: { field: 'legPoleL', kind: 'pole', rootBone: 'leftupleg', midBone: 'leftleg' },
+  kneeR: { field: 'legPoleR', kind: 'pole', rootBone: 'rightupleg', midBone: 'rightleg' },
 };
 const TARGET_COLORS: Record<TargetId, number> = {
   hips: 0xffcc33,
@@ -91,9 +98,6 @@ const TARGET_COLORS: Record<TargetId, number> = {
   kneeL: 0xffa23a,
   kneeR: 0xe07d18,
 };
-/** How far out from the shoulder/hip a pole handle floats (m). */
-const POLE_LEN = 0.32;
-
 /** Selector metadata for the React panel — grouped, labelled, mapped to fields. */
 export const TARGET_LIST: readonly {
   id: TargetId;
@@ -187,7 +191,7 @@ export function createPoseEditorEngine(opts: {
   let running = true;
 
   const handles = {} as Record<TargetId, THREE.Mesh>;
-  const handleGeom = new THREE.SphereGeometry(0.028, 16, 12);
+  const handleGeom = new THREE.SphereGeometry(0.034, 16, 12); // clickable target
   const gizmo = new TransformControls(camera, renderer.domElement);
   gizmo.setMode('translate');
   gizmo.setSpace('world');
@@ -195,8 +199,39 @@ export function createPoseEditorEngine(opts: {
   scene.add(gizmo.getHelper());
   gizmo.addEventListener('dragging-changed', (e) => {
     orbit.enabled = !e.value;
+    // On release, re-seat every handle on its joint (a pole solve moves the
+    // elbow/knee, so the handle would otherwise drift off the joint).
+    if (!e.value) {
+      placeAllHandles();
+      notify();
+    }
   });
   gizmo.addEventListener('objectChange', onGizmoDrag);
+
+  // ── Click-to-select: raycast the handle spheres on pointer down ─────────────
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  const meshToId = new Map<THREE.Object3D, TargetId>();
+  function pickHandle(e: PointerEvent): TargetId | null {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const meshes = Object.values(handles).filter((m) => m.visible);
+    const hit = raycaster.intersectObjects(meshes, false)[0];
+    return hit ? meshToId.get(hit.object) ?? null : null;
+  }
+  function onPointerDown(e: PointerEvent): void {
+    if (gizmo.dragging) return; // the gizmo is handling this press
+    const id = pickHandle(e);
+    if (id && id !== target) setTarget(id); // selecting a different joint
+  }
+  function onPointerMove(e: PointerEvent): void {
+    if (gizmo.dragging) return;
+    renderer.domElement.style.cursor = pickHandle(e) ? 'pointer' : '';
+  }
+  renderer.domElement.addEventListener('pointerdown', onPointerDown);
+  renderer.domElement.addEventListener('pointermove', onPointerMove);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const _v = new THREE.Vector3();
@@ -215,22 +250,25 @@ export function createPoseEditorEngine(opts: {
 
   function placeHandle(id: TargetId): void {
     const mesh = handles[id];
-    const base = baseOf(id);
     const def = TARGETS[id];
-    const val = poseSet[pose][def.field];
-    if (!base) {
-      mesh.visible = false;
-      return;
-    }
-    mesh.visible = true;
     if (def.kind === 'pos') {
+      const base = baseOf(id);
+      if (!base) {
+        mesh.visible = false;
+        return;
+      }
+      const val = poseSet[pose][def.field];
       mesh.position.set(base.x + val[0], base.y + val[1], base.z + val[2]);
+      mesh.visible = true;
     } else {
-      // Float the handle out from the joint along the (normalized) pole dir.
-      _v.set(val[0], val[1], val[2]);
-      if (_v.lengthSq() < 1e-6) _v.set(0, 0, 1);
-      _v.normalize().multiplyScalar(POLE_LEN);
-      mesh.position.set(base.x + _v.x, base.y + _v.y, base.z + _v.z);
+      // Pole handles sit ON the real elbow/knee joint, not floating in mid-air.
+      const mid = rig?.boneWorld(def.midBone ?? '') ?? null;
+      if (!mid) {
+        mesh.visible = false;
+        return;
+      }
+      mesh.position.copy(mid);
+      mesh.visible = true;
     }
   }
   function placeAllHandles(): void {
@@ -300,6 +338,7 @@ export function createPoseEditorEngine(opts: {
       mesh.visible = false;
       scene.add(mesh);
       handles[id] = mesh;
+      meshToId.set(mesh, id);
     }
     applyAndPlace();
     notify();
@@ -361,6 +400,8 @@ export function createPoseEditorEngine(opts: {
   function dispose(): void {
     running = false;
     window.removeEventListener('resize', onResize);
+    renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+    renderer.domElement.removeEventListener('pointermove', onPointerMove);
     gizmo.removeEventListener('objectChange', onGizmoDrag);
     gizmo.detach();
     orbit.dispose();

@@ -26,3 +26,4 @@ export * from './rain';
 export * from './weather';
 export * from './debug-draw';
 export * from './tire-fx';
+export * from './race-markers';

@@ -115,7 +115,7 @@ export function createObstacleVisuals(
       // EdgesGeometry instances aren't tracked; walk children to free them too.
       group.traverse((o) => {
         if (o instanceof THREE.LineSegments) {
-          o.geometry.dispose();
+          (o.geometry as THREE.BufferGeometry).dispose();
           (o.material as THREE.Material).dispose();
         }
       });

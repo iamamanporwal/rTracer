@@ -152,12 +152,24 @@ export type RiderRig = {
   /** Re-pose the rider into `pose`. Idempotent; safe to call every drag. */
   applyPose(pose: RiderPose): void;
   /**
-   * World position of a rider bone (e.g. `'leftarm'`, `'leftupleg'`) after the
-   * last {@link applyPose}, or null if absent. Used by the editor to anchor the
-   * elbow/knee pole gizmos at the real shoulder/hip joints.
+   * World position of a rider bone (e.g. `'leftarm'`, `'leftupleg'`, `'leftleg'`,
+   * `'leftforearm'`) after the last {@link applyPose}, or null if absent. Used by
+   * the editor to anchor the elbow/knee gizmos on the real joints.
    */
   boneWorld(key: string): THREE.Vector3 | null;
+  /**
+   * Runtime secondary motion: add small euler offsets (radians, XYZ) to the
+   * spine-chain bones on top of the last applied pose, so the rider sways/leans/
+   * breathes as the bike is driven instead of riding like a statue. Only the
+   * named spine/neck/head bones move — the IK'd limbs stay put. Cheap; safe to
+   * call every frame. Offsets of 0 reproduce the static pose exactly.
+   */
+  applySpineOffsets(offsets: Partial<Record<SpineOffsetKey, Vec3>>): void;
 };
+
+/** Spine-chain bones the runtime secondary-motion layer is allowed to nudge. */
+export type SpineOffsetKey = 'spine' | 'spine1' | 'spine2' | 'neck' | 'head';
+const SPINE_OFFSET_KEYS: readonly SpineOffsetKey[] = ['spine', 'spine1', 'spine2', 'neck', 'head'];
 
 export type CreateRiderRigOptions = {
   /** The loaded rider FBX scene (already named/scaled/shadowed by the caller). */
@@ -234,7 +246,11 @@ export function createRiderRig(opts: CreateRiderRigOptions): RiderRig {
   const _pegLT = new THREE.Vector3();
   const _pegRT = new THREE.Vector3();
 
+  // The last applied pose — the rest the runtime secondary motion offsets from.
+  let currentPose: RiderPose = DEFAULT_RIDE_POSE;
+
   function applyPose(pose: RiderPose): void {
+    currentPose = pose;
     // 1. Spine/neck tuck (the limbs are handled by IK, below).
     for (const bones of boneMaps) {
       bones.get('spine')?.rotation.set(pose.spine[0], pose.spine[1], pose.spine[2]);
@@ -289,6 +305,19 @@ export function createRiderRig(opts: CreateRiderRigOptions): RiderRig {
     return bone ? bone.getWorldPosition(new THREE.Vector3()) : null;
   }
 
+  function applySpineOffsets(offsets: Partial<Record<SpineOffsetKey, Vec3>>): void {
+    for (const bones of boneMaps) {
+      for (const key of SPINE_OFFSET_KEYS) {
+        const off = offsets[key];
+        if (!off) continue;
+        const bone = bones.get(key);
+        if (!bone) continue;
+        const rest = currentPose[key]; // rest euler from the baked pose
+        bone.rotation.set(rest[0] + off[0], rest[1] + off[1], rest[2] + off[2]);
+      }
+    }
+  }
+
   if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) {
     console.log(
       `[${manifest.id}] rider rig: ${skeletons.length} skeleton(s), grips=${
@@ -297,7 +326,7 @@ export function createRiderRig(opts: CreateRiderRigOptions): RiderRig {
     );
   }
 
-  return { object: rider, hardpoints, applyPose, boneWorld };
+  return { object: rider, hardpoints, applyPose, boneWorld, applySpineOffsets };
 }
 
 // ── IK primitives (model-frame-agnostic) ─────────────────────────────────────

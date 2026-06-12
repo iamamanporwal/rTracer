@@ -190,13 +190,15 @@ export function PauseMenu({
                   />
                 )}
                 {/* Rider pose editor — dev builds only (the page isn't in the prod
-                    bundle), and only for bikes (cars have no rider). Opens in a
-                    new tab so the session keeps running. */}
-                {devMode && import.meta.env.DEV && vehicleIsBike && (
+                    bundle). Always shown in dev mode so it's discoverable, but
+                    disabled for cars (only bikes carry a rider). Opens in a new
+                    tab so the session keeps running. */}
+                {devMode && import.meta.env.DEV && (
                   <Item
                     icon={<PersonStanding size={18} />}
                     label="Rider Pose Editor"
-                    value="Open ↗"
+                    value={vehicleIsBike ? 'Open ↗' : 'Bikes only'}
+                    disabled={!vehicleIsBike}
                     onClick={() =>
                       window.open(`/pose-editor.html?v=${encodeURIComponent(vehicleId)}`, '_blank')
                     }
@@ -227,6 +229,7 @@ function Item({
   onClick,
   primary = false,
   active = false,
+  disabled = false,
 }: {
   icon: ReactNode;
   label: string;
@@ -235,22 +238,29 @@ function Item({
   primary?: boolean;
   /** Highlight as currently-enabled (used by the toggle items). */
   active?: boolean;
+  /** Greyed out + non-interactive (e.g. an action that doesn't apply here). */
+  disabled?: boolean;
 }) {
-  const skin = primary
-    ? 'bg-mw-accent text-mw-bg'
-    : active
-      ? 'border border-mw-accent/70 bg-mw-accent/15 text-mw-text'
-      : 'border border-mw-edge/60 bg-mw-steel/40 text-mw-text hover:border-mw-accent/60';
+  const skin = disabled
+    ? 'border border-mw-edge/40 bg-mw-steel/20 text-mw-muted cursor-not-allowed'
+    : primary
+      ? 'bg-mw-accent text-mw-bg'
+      : active
+        ? 'border border-mw-accent/70 bg-mw-accent/15 text-mw-text'
+        : 'border border-mw-edge/60 bg-mw-steel/40 text-mw-text hover:border-mw-accent/60';
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={
-        'flex w-full touch-none items-center gap-3 px-4 py-3 text-left font-display text-sm font-semibold uppercase tracking-[0.15em] transition-colors active:scale-[0.98] ' +
+        'flex w-full touch-none items-center gap-3 px-4 py-3 text-left font-display text-sm font-semibold uppercase tracking-[0.15em] transition-colors active:scale-[0.98] disabled:active:scale-100 ' +
         skin
       }
     >
-      <span className={primary ? 'text-mw-bg' : 'text-mw-accent'}>{icon}</span>
+      <span className={disabled ? 'text-mw-muted' : primary ? 'text-mw-bg' : 'text-mw-accent'}>
+        {icon}
+      </span>
       <span className="flex-1">{label}</span>
       {value && (
         <span

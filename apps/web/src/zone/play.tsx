@@ -6,6 +6,7 @@ import { loadVehicleManifest, loadZoneManifest, useAsync } from '~/manifests';
 import { useIsTouch } from '~/lib/use-device';
 import {
   startZoneSession,
+  type RaceState,
   type ReplayHandle,
   type ReplayState,
   type SessionStats,
@@ -16,6 +17,7 @@ import { PauseMenu } from './pause-menu';
 import { Speedometer } from './speedometer';
 import { TelemetryOverlay } from './telemetry-overlay';
 import { ReplayOverlay } from './replay-overlay';
+import { RaceHud } from './race-hud';
 
 /**
  * `/play/$zoneId` route — mounts the Three.js canvas and starts a zone session.
@@ -112,6 +114,7 @@ function CanvasMount(props: {
   const [camera, setCamera] = useState<string>('Chase');
   const [skeleton, setSkeletonState] = useState<boolean>(false);
   const [devMode, setDevModeState] = useState<boolean>(false);
+  const [race, setRace] = useState<RaceState | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   // Replay transport state — non-null while the 3D replay player is open. The
@@ -136,6 +139,7 @@ function CanvasMount(props: {
       onWeather: (w) => setWeather(w),
       onCameraMode: (m) => setCamera(m),
       onSkeleton: (on) => setSkeletonState(on),
+      onRace: (r) => setRace(r),
     })
       .then((s) => {
         if (cancelled) {
@@ -247,6 +251,9 @@ function CanvasMount(props: {
           onDownload={downloadTelemetry}
           onPlay={startReplay}
         />
+      )}
+      {devMode && !loading && !replay && session && (
+        <RaceHud state={race} controls={session.race} isTouch={isTouch} />
       )}
       {isTouch && !loading && !replay && <TouchControls session={session} />}
       {!loading && !replay && (
